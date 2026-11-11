@@ -23,16 +23,17 @@
 // openapi.json, agent.json, mcp.json) lives in src/data and is bundled.
 // llms.txt product lines and llms-full.txt are rendered from D1 so prices
 // and stock can never go stale.
-import type { Context } from "hono";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { Hono } from "hono";
+
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
-import { createMcpServer } from "./mcp";
+import type { Context } from "hono";
+import { Hono } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { registerAdminRoutes } from "./admin";
-import { registerProofUploadRoutes } from "./proof_upload";
-import * as db from "./db";
 import { dataFile } from "./data";
+import * as db from "./db";
 import type { Env } from "./env";
+import { createMcpServer } from "./mcp";
+import { registerProofUploadRoutes } from "./proof_upload";
 
 const BASE = "https://agent-friendly-platform.refined-x.workers.dev";
 const VERSION = "1.7.0";
@@ -67,7 +68,9 @@ function dataText(rel: string): string {
 
 function dataJson(rel: string): Record<string, unknown> {
   const v = dataFile(rel);
-  return typeof v === "object" && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
+  return typeof v === "object" && v !== null && !Array.isArray(v)
+    ? (v as Record<string, unknown>)
+    : {};
 }
 
 // --- platform routes ---
@@ -78,13 +81,16 @@ app.get("/robots.txt", (c) => text(c, dataText("robots.txt")));
 app.get("/sitemap.xml", (c) => text(c, dataText("sitemap.xml"), "application/xml; charset=utf-8"));
 app.get("/openapi.json", (c) => json(c, dataJson("openapi.json")));
 app.get("/.well-known/agent.json", (c) => json(c, dataJson("well-known-agent.json")));
-app.get("/health", (c) => json(c, { status: "ok", service: "agent-friendly-platform", version: VERSION }));
+app.get("/health", (c) =>
+  json(c, { status: "ok", service: "agent-friendly-platform", version: VERSION }),
+);
 
 app.get("/shops.json", async (c) => {
   const shops = await db.listShops(c.env.DB);
   return json(c, {
     platform: BASE,
-    discovery: "GET {shop}/llms.txt, then {shop}/openapi.json, {shop}/agent.json, {shop}/api/products.json",
+    discovery:
+      "GET {shop}/llms.txt, then {shop}/openapi.json, {shop}/agent.json, {shop}/api/products.json",
     shops: shops.map((s) => ({
       slug: s.slug,
       name: s.name,
@@ -130,16 +136,16 @@ app.get("/shops/:shop/llms-full.txt", async (c) => {
       `- price: ${p.price} CNY`,
       `- stock: ${p.stock}`,
       `- ${p.description}`,
-      ``
+      ``,
     );
   }
   lines.push(
     `## Policies`,
     `- Shipping: flat ${policies.shipping_flat_cny} CNY, free over ${policies.free_over_cny} CNY. Ships in ${policies.lead_time}.`,
     `- Returns: ${policies.returns_window_days} days, ${policies.returns_condition}, buyer pays return shipping.`,
-    `- Privacy: ${policies.privacy}`
+    `- Privacy: ${policies.privacy}`,
   );
-  return text(c, lines.join("\n") + "\n");
+  return text(c, `${lines.join("\n")}\n`);
 });
 
 app.get("/shops/:shop/llms.txt", async (c) => {
@@ -151,14 +157,11 @@ app.get("/shops/:shop/llms.txt", async (c) => {
   const start = template.indexOf("## What this shop sells\n");
   const end = template.indexOf("\n## How to interact", start);
   if (start !== -1 && end !== -1) {
-    const lines =
-      products
-        .map((p) => `- ${p.name} — ${p.price} CNY, stock ${p.stock}. ${p.description}`)
-        .join("\n") + "\n";
+    const lines = `${products
+      .map((p) => `- ${p.name} — ${p.price} CNY, stock ${p.stock}. ${p.description}`)
+      .join("\n")}\n`;
     template =
-      template.slice(0, start + "## What this shop sells\n".length) +
-      lines +
-      template.slice(end);
+      template.slice(0, start + "## What this shop sells\n".length) + lines + template.slice(end);
   }
   return text(c, template);
 });
@@ -169,7 +172,10 @@ app.get("/shops/:shop/agent.json", staticShopFile("agent.json", "application/jso
 app.get("/shops/:shop/mcp.json", staticShopFile("mcp.json", "application/json"));
 app.get("/shops/:shop/guide.md", staticShopFile("guide.md", "text/markdown; charset=utf-8"));
 app.get("/shops/:shop/starter-prompt.txt", staticShopFile("starter-prompt.txt"));
-app.get("/shops/:shop/.well-known/agent.json", staticShopFile("well-known-agent.json", "application/json"));
+app.get(
+  "/shops/:shop/.well-known/agent.json",
+  staticShopFile("well-known-agent.json", "application/json"),
+);
 
 // --- per-shop D1-backed JSON ---
 app.get("/shops/:shop/api/products.json", async (c) => {
@@ -207,7 +213,12 @@ app.get("/shops/:shop/api/catalog.json", async (c) => {
     name: shop.name,
     url: `${BASE}/shops/${slug}/`,
     currency: "CNY",
-    products: products.map((p) => ({ id: p.id, name: p.name, price: p.price, currency: p.currency })),
+    products: products.map((p) => ({
+      id: p.id,
+      name: p.name,
+      price: p.price,
+      currency: p.currency,
+    })),
   });
 });
 
@@ -249,7 +260,8 @@ app.get("/shops/:shop/api/recommendations.json", async (c) => {
   if (!shop) return notFound(c, `unknown shop: ${slug}`);
   const tpl = dataJson(`shops/${slug}/api/recommendations.json`);
   const { recs, bundles } = await db.getRecommendations(c.env.DB, slug);
-  const tplRecs = (tpl.recommendations as { product_id: string; pairs_with?: string[] }[] | undefined) || [];
+  const tplRecs =
+    (tpl.recommendations as { product_id: string; pairs_with?: string[] }[] | undefined) || [];
   const pairs = new Map(tplRecs.map((r) => [r.product_id, r.pairs_with || []]));
   return json(c, {
     ...tpl,
@@ -278,7 +290,10 @@ app.get("/shops/:shop/api/presentation.json", async (c) => {
       name_en: p.name,
       price: { amount: p.price, currency: p.currency },
       // Same thresholds as the source IR: 0 = out_of_stock, 1-10 = low_stock.
-      stock: { status: p.stock === 0 ? "out_of_stock" : p.stock <= 10 ? "low_stock" : "in_stock", quantity: p.stock },
+      stock: {
+        status: p.stock === 0 ? "out_of_stock" : p.stock <= 10 ? "low_stock" : "in_stock",
+        quantity: p.stock,
+      },
       product_url: p.url,
       attributes: [{ key: "描述", value: p.description }],
       snippet: p.description,

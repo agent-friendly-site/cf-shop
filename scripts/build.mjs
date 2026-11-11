@@ -1,9 +1,9 @@
 #!/usr/bin/env node
+import { mkdirSync } from "node:fs";
 // Bundle the Hono app to a single ES module for upload with cf.py worker-put.
 // esbuild resolves hono + @modelcontextprotocol/sdk + zod into one file;
 // data files are inlined (JSON natively, .txt/.md/.html as text).
 import { build } from "esbuild";
-import { mkdirSync } from "node:fs";
 
 mkdirSync(new URL("../dist", import.meta.url), { recursive: true });
 

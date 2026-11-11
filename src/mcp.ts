@@ -24,9 +24,9 @@
 // never does (the seller needs time to verify).
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { Env } from "./env";
-import * as db from "./db";
 import type { Product } from "./db";
+import * as db from "./db";
+import type { Env } from "./env";
 
 const ItemShape = z.object({
   product_id: z.string(),
@@ -67,7 +67,7 @@ export function createMcpServer(env: Env, shop: string) {
     async () => {
       const products = await db.listProducts(env.DB, shop);
       return mcpText({ shop, currency: "CNY", products: products.map(publicProduct) });
-    }
+    },
   );
 
   server.registerTool(
@@ -81,7 +81,7 @@ export function createMcpServer(env: Env, shop: string) {
       const p = await db.getProduct(env.DB, shop, product_id);
       if (!p) throw new Error(`unknown product_id: ${product_id}`);
       return mcpText({ shop, product: publicProduct(p) });
-    }
+    },
   );
 
   server.registerTool(
@@ -113,22 +113,21 @@ export function createMcpServer(env: Env, shop: string) {
         alternative: withWhy(alt),
         note: "首选 1 个 + 备选 1 个；先问用途再推荐；总价按 calculate_total 算。",
       });
-    }
+    },
   );
 
   server.registerTool(
     "calculate_total",
     {
       title: "Calculate total",
-      description:
-        "Calculate subtotal, shipping (12 CNY, free over 200 CNY) and total for items.",
+      description: "Calculate subtotal, shipping (12 CNY, free over 200 CNY) and total for items.",
       inputSchema: { items: z.array(ItemShape) },
     },
     async ({ items }) => {
       const products = await db.listProducts(env.DB, shop);
       const t = db.totals(items || [], products);
       return mcpText({ shop, ...t });
-    }
+    },
   );
 
   server.registerTool(
@@ -166,7 +165,8 @@ export function createMcpServer(env: Env, shop: string) {
         order,
         payment: payment?.payment || {
           method: "offline",
-          summary: "线下支付：确认订单后卖家提供收款方式，买家在 Agent 外付款，付款后提交付款凭据，卖家核验到账后发货。",
+          summary:
+            "线下支付：确认订单后卖家提供收款方式，买家在 Agent 外付款，付款后提交付款凭据，卖家核验到账后发货。",
         },
         total_verbatim: t.verbatim,
         payment_deadline: {
@@ -179,11 +179,12 @@ export function createMcpServer(env: Env, shop: string) {
           expires_at: link.expires_at,
           how: "把这个链接发给买家：买家在浏览器里打开，直接上传付款截图，图片直达平台，不经过你识别。链接一次有效，7 天内有效；用过或过期后用 get_payment_proof_upload_link 再取一个。",
         },
-        next_step: "买家按卖家给的线下收款方式付款，然后提交付款凭据：有交易单号就直接发给你，你用 submit_payment_proof 提交；有付款截图就把 proof_upload.url 发给买家，让买家在浏览器里直接上传，图片不经过你识别。",
+        next_step:
+          "买家按卖家给的线下收款方式付款，然后提交付款凭据：有交易单号就直接发给你，你用 submit_payment_proof 提交；有付款截图就把 proof_upload.url 发给买家，让买家在浏览器里直接上传，图片不经过你识别。",
         tracking:
           "先不要建跟踪任务：等买家提交付款凭据（submit_payment_proof 成功，或买家用上传链接传完截图，订单变为 payment_submitted）之后，再为这个订单建跟踪任务：每 6 小时查一次 get_order，有变化就告诉买家，直到订单完成或取消；订单取消时一并删除跟踪任务。",
       });
-    }
+    },
   );
 
   server.registerTool(
@@ -212,11 +213,12 @@ export function createMcpServer(env: Env, shop: string) {
         order,
         verification:
           "订单已标记为待核验（payment_submitted），不是已付款。卖家须核对到账和金额后用 confirm_payment 确认，确认后订单才变为已付款并发货。",
-        next_step: "Seller: check the actual receipt (bank / WeChat / Alipay) and amount, then call confirm_payment with verified_amount_cny equal to the order total.",
+        next_step:
+          "Seller: check the actual receipt (bank / WeChat / Alipay) and amount, then call confirm_payment with verified_amount_cny equal to the order total.",
         tracking:
           "凭据已提交，现在为这个订单建跟踪任务：每 6 小时查一次 get_order，状态变了就主动告诉买家新状态是什么意思、下一步是什么；到 completed 或 cancelled 发一条结尾消息并删除跟踪任务，不再继续查。买家不用记订单号，直接问订单怎么样了就行。",
       });
-    }
+    },
   );
 
   server.registerTool(
@@ -242,7 +244,7 @@ export function createMcpServer(env: Env, shop: string) {
         tracking:
           "买家传完截图、订单变为 payment_submitted 之后，再为这个订单建跟踪任务：每 6 小时查一次 get_order，有变化就告诉买家，直到订单完成或取消；订单取消时一并删除跟踪任务。",
       });
-    }
+    },
   );
 
   server.registerTool(
@@ -267,7 +269,7 @@ export function createMcpServer(env: Env, shop: string) {
         order,
         verification: `Seller confirmed receipt of ${verified_amount_cny} CNY for order ${order_id}; order is now paid and can ship.`,
       });
-    }
+    },
   );
 
   server.registerTool(
@@ -282,7 +284,7 @@ export function createMcpServer(env: Env, shop: string) {
       const order = await db.getOrder(env.DB, order_id);
       if (!order) throw new Error(`unknown order_id: ${order_id}`);
       return mcpText({ order });
-    }
+    },
   );
 
   server.registerTool(
@@ -307,7 +309,7 @@ export function createMcpServer(env: Env, shop: string) {
         order,
         note: `Order ${order_id} is now shipped${carrier ? ` via ${carrier}` : ""}${tracking_number ? `, tracking ${tracking_number}` : ""}. The buyer will be told automatically by their tracking task.`,
       });
-    }
+    },
   );
 
   server.registerTool(
@@ -324,7 +326,7 @@ export function createMcpServer(env: Env, shop: string) {
         order,
         note: `Order ${order_id} is now completed. Thank you — delete the tracking task for this order; it stops here.`,
       });
-    }
+    },
   );
 
   server.registerTool(
@@ -344,7 +346,7 @@ export function createMcpServer(env: Env, shop: string) {
         order,
         note: `Order ${order_id} is now cancelled. Also cancel/delete the tracking task for this order (if one exists) and tell the buyer tracking has stopped — do not keep polling it.`,
       });
-    }
+    },
   );
 
   server.registerTool(
@@ -371,7 +373,7 @@ export function createMcpServer(env: Env, shop: string) {
         order,
         note: `Buyer info updated for order ${order_id}. Verify with get_order: buyer_name / buyer_contact / shipping_address now show the new values, and the timeline has a buyer_info_updated event.`,
       });
-    }
+    },
   );
 
   return server;

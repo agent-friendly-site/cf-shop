@@ -7,9 +7,9 @@
 // the admin is for the human seller, not for buyers' agents.
 import type { Context, Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import type { Env } from "./env";
-import * as db from "./db";
 import type { Order, ShopPolicies } from "./db";
+import * as db from "./db";
+import type { Env } from "./env";
 
 type AppEnv = { Bindings: Env };
 type AppContext = Context<AppEnv>;
@@ -93,7 +93,12 @@ export function registerAdminRoutes(app: Hono<AppEnv>) {
   app.get("/shops/:shop/admin/", async (c) => {
     const shop = await db.getShop(c.env.DB, c.req.param("shop"));
     if (!shop) return json(c, { error: `unknown shop: ${c.req.param("shop")}` }, 404);
-    return c.html(ADMIN_HTML.replaceAll("__SHOP__", shop.slug).replaceAll("__SHOP_NAME__", escapeHtml(shop.name_zh || shop.name)));
+    return c.html(
+      ADMIN_HTML.replaceAll("__SHOP__", shop.slug).replaceAll(
+        "__SHOP_NAME__",
+        escapeHtml(shop.name_zh || shop.name),
+      ),
+    );
   });
   app.get("/shops/:shop/admin", (c) => c.redirect(`/shops/${c.req.param("shop")}/admin/`, 301));
 
@@ -111,7 +116,7 @@ export function registerAdminRoutes(app: Hono<AppEnv>) {
     const res = json(c, { shop: slug, expires });
     res.headers.set(
       "Set-Cookie",
-      `af_admin=${token}; Path=/shops/${slug}/admin/; HttpOnly; Secure; SameSite=Lax; Max-Age=86400`
+      `af_admin=${token}; Path=/shops/${slug}/admin/; HttpOnly; Secure; SameSite=Lax; Max-Age=86400`,
     );
     return res;
   });
@@ -122,7 +127,7 @@ export function registerAdminRoutes(app: Hono<AppEnv>) {
     const res = json(c, { ok: true });
     res.headers.set(
       "Set-Cookie",
-      `af_admin=; Path=/shops/${slug}/admin/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`
+      `af_admin=; Path=/shops/${slug}/admin/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`,
     );
     return res;
   });
@@ -160,7 +165,7 @@ export function registerAdminRoutes(app: Hono<AppEnv>) {
     const order = await db.getOrder(c.env.DB, c.req.param("id"));
     if (!order || order.shop !== slug) return json(c, { error: "unknown order" }, 404);
     const proof = (order.proofs || []).find((p) => p.id === c.req.param("proofId"));
-    if (!proof || proof.proof_type !== "image" || !proof.r2_key) {
+    if (proof?.proof_type !== "image" || !proof.r2_key) {
       return json(c, { error: "no image proof" }, 404);
     }
     const obj = await c.env.PROOFS.get(proof.r2_key);
@@ -268,7 +273,7 @@ export function registerAdminRoutes(app: Hono<AppEnv>) {
         payment = await db.updatePaymentMethods(
           c.env.DB,
           slug,
-          patch.payment_methods as { id: string; instructions: string }[]
+          patch.payment_methods as { id: string; instructions: string }[],
         );
       }
       return json(c, { shop: slug, policies: policyShape(pol), payment: payment?.payment || null });
@@ -279,7 +284,11 @@ export function registerAdminRoutes(app: Hono<AppEnv>) {
 }
 
 function escapeHtml(s: string) {
-  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 // Platform-owned admin page (not merchant markup). Plain HTML + fetch,

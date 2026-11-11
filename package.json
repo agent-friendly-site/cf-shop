@@ -11,6 +11,8 @@
     "seed": "python3 scripts/seed.py",
     "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "format": "biome check --write .",
     "dev": "wrangler dev",
     "test": "python3 tests/test_client.py"
   },
@@ -23,6 +25,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.6.6",
     "@cloudflare/workers-types": "^5.20261110.1",
     "esbuild": "^0.28.2",
     "typescript": "^5.9.2",

@@ -32,17 +32,21 @@ npm run seed         # 从 src/data 同步商品/政策到 D1（要账号和库 
 
 ```
 src/
-  index.js         入口：全部路由 + scheduled()
-  db.js            数据访问 + 业务逻辑（740 行，正在拆——见重构计划）
-  mcp.js           13 个 MCP 工具
-  admin.js         后台 API + 后台页面（ADMIN_HTML 模板字符串，正在拆）
-  proof_upload.js  上传页 + 上传接口
-  data.js          生成的静态文件 import map（别手改，用 scripts/gen_data_module.py 生成）
+  index.ts         入口：全部路由 + scheduled()
+  db.ts            数据访问 + 业务逻辑（正在拆——见重构计划）
+  mcp.ts           13 个 MCP 工具
+  admin.ts         后台 API + 后台页面（ADMIN_HTML 模板字符串，正在拆）
+  proof_upload.ts  上传页 + 上传接口
+  data.ts          生成的静态文件 import map（别手改，用 scripts/gen_data_module.py 生成）
+  env.ts           Env 类型（DB / PROOFS）
   data/            店铺事实：商品、价格、政策、guide、mcp.json 等（改事实只改这里）
 migrations/        D1 建表 SQL（0001–0005）
 tests/             Python 线上 E2E
 scripts/           Python 运维脚本（seed、生成 key、改店铺事实）
+spike-honox/       Phase 0 HonoX spike（独立 Worker，不进生产路径）
 wrangler.toml      绑定（D1、R2）和触发器
+biome.json         Biome lint/format
+tsconfig.json      TypeScript strict
 ```
 
 ## 规矩
@@ -71,10 +75,12 @@ wrangler.toml      绑定（D1、R2）和触发器
   D1 `agent-friendly-orders`（`dd3c36b4-a260-4fc5-9da2-b9b06ccfb1cc`），
   R2 `agent-friendly-proofs`（绑定 `PROOFS`）。
 - 部署命令（构建 + 上传；`wrangler.toml` 已含 D1/R2/cron）：
+
   ```bash
   npm run build
   npx wrangler deploy
   ```
+
   需先 `npx wrangler login`（OAuth；token 不进仓库）。WSL 与 Windows
   的 wrangler 凭证目录不同，换环境要重新 login 或同步 config。
 - Phase 0（2026-11-11）已验证 wrangler 可用；cf.py `worker-put` 保留为兜底，
@@ -113,9 +119,8 @@ wrangler.toml      绑定（D1、R2）和触发器
 
 - v1.7.0 已上线：15 分钟未付款自动取消、上传链接交截图、卖家核验、
   跟踪 + 后台管理。全部功能见 `README.md` 的版本记录。
-- 进行中：`docs/refactor-plan.md` 的 v2.0 重构。**Phase 0 已通过**；
-  **Phase 1.1 已完成**（`src/` 全仓 TypeScript `strict`，`npm run typecheck`）。
-  下一步 Phase 1.2 Biome → 1.5 Vitest。前端已定 HonoX 0.1.62（pin 死）+ React
-  渲染器 + Tailwind v4 + shadcn/ui；只接后台和上传页，API/MCP 不迁文件路由。
-  接手时先读计划，按阶段做，不要跳阶段。
+- 进行中：`docs/refactor-plan.md` 的 v2.0 重构。**Phase 0 / 1.1 / 1.2 已完成**
+  （TS strict + Biome：`npm run typecheck` / `npm run lint`）。下一步 Phase 1.5 Vitest。
+  前端已定 HonoX 0.1.62（pin 死）+ React 渲染器 + Tailwind v4 + shadcn/ui；
+  只接后台和上传页，API/MCP 不迁文件路由。接手时先读计划，按阶段做，不要跳阶段。
 - 待 Hall 手动做的事：关 GitHub Pages；在真机上点一遍后台和上传页（Phase 5 检查点）。

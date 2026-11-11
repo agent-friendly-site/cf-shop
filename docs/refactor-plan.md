@@ -1,7 +1,7 @@
 # 重构计划 — agent-friendly-platform v2.0（Hono + TS）
 
-> 状态：**Phase 0 已通过；Phase 1.1（TypeScript strict）已完成（2026-11-11）**。
-> 下一步 1.2 Biome → 1.5 Vitest。本文是重构的需求文档；Phase 0 结论见 §2.2 末尾。
+> 状态：**Phase 0 / 1.1 / 1.2 已完成（2026-11-11）**（TS strict + Biome）。
+> 下一步 1.5 Vitest workers-pool。本文是重构的需求文档；Phase 0 结论见 §2.2 末尾。
 > 执行时每个阶段都要能独立部署、独立验证；重构不改变任何对外行为，除非本文件
 > 明确写出。业务规则见附录 A（重构期间这些规则一个字都不动）。
 
@@ -52,18 +52,18 @@ v1.0–v1.7.0 是在一天之内按需求叠出来的 demo：Hono Worker + D1，
 
 ### 1.1 规模
 
-| 位置 | 行数 | 说明 |
-| --- | --- | --- |
-| `src/db.js` | 740 | 数据访问 + 业务逻辑 + 定时任务，约 30 个导出 |
-| `src/mcp.js` | 375 | 13 个 MCP 工具，全部 inline 注册 |
-| `src/index.js` | 323 | 约 25 条路由 + `scheduled()` |
-| `src/admin.js` | 457 | 后台 API + `ADMIN_HTML` 模板字符串（约 190 行 HTML+JS） |
-| `src/proof_upload.js` | 175 | 上传页 HTML 生成 + POST 处理 |
-| `src/data.js` | 115 | 生成的静态文件 import map（`gen_data_module.py` 产出） |
-| `src/data/` | 约 45 个文件 | 3 家店 × 15 个文件（llms.txt、openapi.json、agent.json、mcp.json、guide.md 等） |
-| `migrations/` | 0001–0005 | 手写 SQL，14 张表；仓库里没有 migration runner |
-| `tests/` | 540 | Python + curl 打线上（test_client.py、test_admin.py、compare_routes.py） |
-| `scripts/` | 约 420 | Python：seed、import、gen_data、update_shop_facts、gen_admin_keys |
+| 位置                  | 行数         | 说明                                                                            |
+| --------------------- | ------------ | ------------------------------------------------------------------------------- |
+| `src/db.js`           | 740          | 数据访问 + 业务逻辑 + 定时任务，约 30 个导出                                    |
+| `src/mcp.js`          | 375          | 13 个 MCP 工具，全部 inline 注册                                                |
+| `src/index.js`        | 323          | 约 25 条路由 + `scheduled()`                                                    |
+| `src/admin.js`        | 457          | 后台 API + `ADMIN_HTML` 模板字符串（约 190 行 HTML+JS）                         |
+| `src/proof_upload.js` | 175          | 上传页 HTML 生成 + POST 处理                                                    |
+| `src/data.js`         | 115          | 生成的静态文件 import map（`gen_data_module.py` 产出）                          |
+| `src/data/`           | 约 45 个文件 | 3 家店 × 15 个文件（llms.txt、openapi.json、agent.json、mcp.json、guide.md 等） |
+| `migrations/`         | 0001–0005    | 手写 SQL，14 张表；仓库里没有 migration runner                                  |
+| `tests/`              | 540          | Python + curl 打线上（test_client.py、test_admin.py、compare_routes.py）        |
+| `scripts/`            | 约 420       | Python：seed、import、gen_data、update_shop_facts、gen_admin_keys               |
 
 依赖：`hono ^4.13`、`@modelcontextprotocol/sdk ^1.32`、`zod ^4.6`、
 `esbuild`、`wrangler ^4.160`（devDeps）。本地 Node v24。
@@ -102,22 +102,22 @@ v1.0–v1.7.0 是在一天之内按需求叠出来的 demo：Hono Worker + D1，
 不用学新框架就能改；后台的复杂交互交给成熟的 React 组件生态，
 而不是手写组件。**
 
-| 层 | 选择 | 为什么是它 | 替代方案（为什么不选） |
-| --- | --- | --- | --- |
-| 语言 | **TypeScript（strict）** | 对 coding agent 收益最大：类型即文档，改字段、改接口时编译器先报错；Hono + MCP SDK 都是 TS 优先 | 继续 JS：省事但 agent 每次都要靠 grep 猜形状 |
-| 框架 | **Hono（保留）** | 已在用；Workers 原生、体积小、类型完备 | 不换框架是本次非目标 |
-| 全栈框架（前端） | **HonoX 0.1.x（alpha，见 §2.1 风险）** | Hono 官方 meta-framework：文件路由 + SSR + Islands 水合，只给交互组件发 JS；`createApp()` 返回的就是 Hono 实例，可挂载现有 API | 纯 Vite + React SPA：脱离 Hono，又要多维护一套路由/渲染；hono/jsx + 手写 CSS：已证明撑不起后台体验（§0.1、2026-11-11 讨论） |
-| 渲染器 | **React（BYOR，`@hono/react-renderer`）** | HonoX 默认是 hono/jsx；要上 shadcn/ui 必须走 BYOR 换 React 渲染器。React 岛用 `/** @jsxImportSource react */`，写 `className`、从 `react` 引 hooks，与 hono/jsx（`class`、`hono/jsx`）不混用 | 默认 hono/jsx：组件生态小，shadcn 要用非官方的 shadcn-hono-jsx 移植版；见 §2.1 兜底 |
-| 服务端渲染 | **HonoX SSR + Islands** | 首屏服务端渲染，后台列表/详情先出 HTML；只有交互岛（筛选、详情操作、行内编辑、文件选择、倒计时）才水合 | 整页 SPA 水合：首屏慢、JS 量大，两个页面用不上 |
-| 校验 | **Zod v4（保留并推广）** | 已在用；所有边界（MCP 入参、HTTP body/query、D1 行）都用同一套 schema | 不引入新校验库 |
-| 数据库 | **Drizzle ORM（drizzle-orm/d1）+ drizzle-kit** | Hono + D1 的标准组合；schema 即类型，单点事实；migration 由工具生成和管理 | 继续手写 SQL：类型要手写两份，迟早漂移；Prisma：Workers 上重，且与 D1 的结合不如 Drizzle |
-| 测试 | **Vitest + @cloudflare/vitest-pool-workers** | 在 miniflare 里跑真 D1，单元 + 集成测试本地就能跑；cron 逻辑可本地触发验证 | 继续 Python + curl：只保留为上线后的冒烟检查，不再是主测试 |
-| Lint/Format | **Biome** | 一个工具管 lint + format，零配置倾向，速度快 | ESLint + Prettier：两个工具两份配置，收益相同 |
-| 构建/部署 | **Vite（HonoX 插件）+ wrangler（目标），cf.py 保留为兜底** | HonoX 是 Vite-centric：构建分两遍（`vite build --mode client && vite build`），Workers 产物走 `@hono/vite-build/cloudflare-workers`；`wrangler deploy` 一次做完部署 + 触发器 | 见 §2.2：先做 Phase 0 验证，通不过就保留 cf.py |
-| 脚本 | **Node + TS（tsx）** | 仓库一种语言；seed / 改事实 / 生成 import map 全部改写为 TS | 继续 Python：双语言是本次要消除的债 |
-| 前端样式 | **Tailwind CSS v4（`@tailwindcss/vite`）** | HonoX 官方指引的样式方案；`app/style.css` 里 `@import "tailwindcss" source("../app")`，在 `_renderer.tsx` 里用 `Link` 引入；设计 token（颜色、状态徽标、按钮）两页共用 | 手写单文件 CSS：两个页面约 200 行够用，但后台组件一多就失控，且与 shadcn 不搭 |
-| 前端组件 | **shadcn/ui（React / Radix）** | 后台要的 Table、Dialog、Toast、Form、Badge、Skeleton 都是现成可复制的组件；无障碍（键盘、焦点）由 Radix 兜底；coding agent 训练语料最多 | 手写组件：重造轮子，且容易丢无障碍；Mantine/Ant Design：重、与 Tailwind v4 搭配的胶水多，不如 shadcn 轻 |
-| 前端数据 | **TanStack Query + React Hook Form + Zod** | 后台是服务端状态密集页：列表加载/错误重试/操作后自动刷新由 Query 管；确认收款、发货、改价/改政策的表单由 Hook Form + Zod 管，校验与后端共用 schema | 手写 fetch + 手动刷 DOM：正是现在 `admin.js` 的写法，状态一多就乱 |
+| 层               | 选择                                                       | 为什么是它                                                                                                                                                                                   | 替代方案（为什么不选）                                                                                                      |
+| ---------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| 语言             | **TypeScript（strict）**                                   | 对 coding agent 收益最大：类型即文档，改字段、改接口时编译器先报错；Hono + MCP SDK 都是 TS 优先                                                                                              | 继续 JS：省事但 agent 每次都要靠 grep 猜形状                                                                                |
+| 框架             | **Hono（保留）**                                           | 已在用；Workers 原生、体积小、类型完备                                                                                                                                                       | 不换框架是本次非目标                                                                                                        |
+| 全栈框架（前端） | **HonoX 0.1.x（alpha，见 §2.1 风险）**                     | Hono 官方 meta-framework：文件路由 + SSR + Islands 水合，只给交互组件发 JS；`createApp()` 返回的就是 Hono 实例，可挂载现有 API                                                               | 纯 Vite + React SPA：脱离 Hono，又要多维护一套路由/渲染；hono/jsx + 手写 CSS：已证明撑不起后台体验（§0.1、2026-11-11 讨论） |
+| 渲染器           | **React（BYOR，`@hono/react-renderer`）**                  | HonoX 默认是 hono/jsx；要上 shadcn/ui 必须走 BYOR 换 React 渲染器。React 岛用 `/** @jsxImportSource react */`，写 `className`、从 `react` 引 hooks，与 hono/jsx（`class`、`hono/jsx`）不混用 | 默认 hono/jsx：组件生态小，shadcn 要用非官方的 shadcn-hono-jsx 移植版；见 §2.1 兜底                                         |
+| 服务端渲染       | **HonoX SSR + Islands**                                    | 首屏服务端渲染，后台列表/详情先出 HTML；只有交互岛（筛选、详情操作、行内编辑、文件选择、倒计时）才水合                                                                                       | 整页 SPA 水合：首屏慢、JS 量大，两个页面用不上                                                                              |
+| 校验             | **Zod v4（保留并推广）**                                   | 已在用；所有边界（MCP 入参、HTTP body/query、D1 行）都用同一套 schema                                                                                                                        | 不引入新校验库                                                                                                              |
+| 数据库           | **Drizzle ORM（drizzle-orm/d1）+ drizzle-kit**             | Hono + D1 的标准组合；schema 即类型，单点事实；migration 由工具生成和管理                                                                                                                    | 继续手写 SQL：类型要手写两份，迟早漂移；Prisma：Workers 上重，且与 D1 的结合不如 Drizzle                                    |
+| 测试             | **Vitest + @cloudflare/vitest-pool-workers**               | 在 miniflare 里跑真 D1，单元 + 集成测试本地就能跑；cron 逻辑可本地触发验证                                                                                                                   | 继续 Python + curl：只保留为上线后的冒烟检查，不再是主测试                                                                  |
+| Lint/Format      | **Biome**                                                  | 一个工具管 lint + format，零配置倾向，速度快                                                                                                                                                 | ESLint + Prettier：两个工具两份配置，收益相同                                                                               |
+| 构建/部署        | **Vite（HonoX 插件）+ wrangler（目标），cf.py 保留为兜底** | HonoX 是 Vite-centric：构建分两遍（`vite build --mode client && vite build`），Workers 产物走 `@hono/vite-build/cloudflare-workers`；`wrangler deploy` 一次做完部署 + 触发器                 | 见 §2.2：先做 Phase 0 验证，通不过就保留 cf.py                                                                              |
+| 脚本             | **Node + TS（tsx）**                                       | 仓库一种语言；seed / 改事实 / 生成 import map 全部改写为 TS                                                                                                                                  | 继续 Python：双语言是本次要消除的债                                                                                         |
+| 前端样式         | **Tailwind CSS v4（`@tailwindcss/vite`）**                 | HonoX 官方指引的样式方案；`app/style.css` 里 `@import "tailwindcss" source("../app")`，在 `_renderer.tsx` 里用 `Link` 引入；设计 token（颜色、状态徽标、按钮）两页共用                       | 手写单文件 CSS：两个页面约 200 行够用，但后台组件一多就失控，且与 shadcn 不搭                                               |
+| 前端组件         | **shadcn/ui（React / Radix）**                             | 后台要的 Table、Dialog、Toast、Form、Badge、Skeleton 都是现成可复制的组件；无障碍（键盘、焦点）由 Radix 兜底；coding agent 训练语料最多                                                      | 手写组件：重造轮子，且容易丢无障碍；Mantine/Ant Design：重、与 Tailwind v4 搭配的胶水多，不如 shadcn 轻                     |
+| 前端数据         | **TanStack Query + React Hook Form + Zod**                 | 后台是服务端状态密集页：列表加载/错误重试/操作后自动刷新由 Query 管；确认收款、发货、改价/改政策的表单由 Hook Form + Zod 管，校验与后端共用 schema                                           | 手写 fetch + 手动刷 DOM：正是现在 `admin.js` 的写法，状态一多就乱                                                           |
 
 **明确不引入**：Vue/Svelte、tRPC、Prisma、任何状态管理库（Zustand/Redux 等）、
 任何 SPA 路由库（HonoX 文件路由已覆盖）。React 只出现在 HonoX 岛里，
@@ -333,59 +333,59 @@ scripts/
 
 ### 4.1 Phase 1 — 地基（先做，后面都依赖它）
 
-| # | 任务 | 验收 |
-| --- | --- | --- |
-| 1.1 | TypeScript：全仓改 `.ts`，`strict: true`；esbuild 已支持 TS，构建脚本基本不动；修掉所有类型错误 | `npx tsc --noEmit` 通过；`npm run build` 产物与之前等价（/health、关键路由冒烟通过） |
-| 1.2 | Biome 接入：`biome.json`，`npm run lint` / `npm run format`；全仓格式化一次（单独 commit，不混业务改动） | lint 零错误；格式化 commit 里只有空白/风格变化 |
-| 1.3 | Phase 0 部署验证（§2.2（a））：wrangler deploy 是否走通；定稿部署命令，写进 README 和 AGENTS.md | 明确结论 + 命令；线上版本不变 |
-| 1.4 | HonoX spike（§2.2（b））：最小 HonoX + React 渲染器 + Tailwind + shadcn 应用，验证混合挂载、岛水合、两遍构建、线上登录→列表→确认收款一条线；产物大小记入 README | spike 验收 4 项全过，或按 §2.1 走兜底并记录决策；**不通过不进 Phase 5** |
-| 1.5 | Vitest + workers-pool 搭架子：能跑一个最小集成测试（建 D1、seed、调一次服务） | `npm test` 本地通过，不依赖线上 |
+| #   | 任务                                                                                                                                                            | 验收                                                                                 |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| 1.1 | TypeScript：全仓改 `.ts`，`strict: true`；esbuild 已支持 TS，构建脚本基本不动；修掉所有类型错误                                                                 | `npx tsc --noEmit` 通过；`npm run build` 产物与之前等价（/health、关键路由冒烟通过） |
+| 1.2 | Biome 接入：`biome.json`，`npm run lint` / `npm run format`；全仓格式化一次（单独 commit，不混业务改动）                                                        | lint 零错误；格式化 commit 里只有空白/风格变化                                       |
+| 1.3 | Phase 0 部署验证（§2.2（a））：wrangler deploy 是否走通；定稿部署命令，写进 README 和 AGENTS.md                                                                 | 明确结论 + 命令；线上版本不变                                                        |
+| 1.4 | HonoX spike（§2.2（b））：最小 HonoX + React 渲染器 + Tailwind + shadcn 应用，验证混合挂载、岛水合、两遍构建、线上登录→列表→确认收款一条线；产物大小记入 README | spike 验收 4 项全过，或按 §2.1 走兜底并记录决策；**不通过不进 Phase 5**              |
+| 1.5 | Vitest + workers-pool 搭架子：能跑一个最小集成测试（建 D1、seed、调一次服务）                                                                                   | `npm test` 本地通过，不依赖线上                                                      |
 
 ### 4.2 Phase 2 — 数据层（Drizzle）
 
-| # | 任务 | 验收 |
-| --- | --- | --- |
-| 2.1 | `db/schema.ts`：14 张表的 Drizzle schema，与现有 D1 结构逐字段对照 | 与 `migrations/0001–0005` 的建表语句逐表核对无差异；`drizzle-kit check` 通过 |
-| 2.2 | `db/repositories/*`：把 `db.js` 的纯查询按聚合拆开（catalog / orders / proofs / admin），签名不变、逻辑不变 | 现有 Python E2E 全过（行为未变） |
-| 2.3 | drizzle-kit 接管 migrations：从当前 schema 生成基线，`migrations/` 旧 SQL 归档为 `migrations/archive/`，README 写清新流程 | 新库从零 `migrate` 后与线上结构一致（表名、字段、索引逐项比对） |
-| 2.4 | seed 脚本改写为 TS（`scripts/seed.ts`）：读 `src/data`，写 D1；与旧 `seed.py` 输出逐行比对 | 同一份 `src/data`，新旧脚本写入的 D1 内容一致 |
+| #   | 任务                                                                                                                      | 验收                                                                         |
+| --- | ------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| 2.1 | `db/schema.ts`：14 张表的 Drizzle schema，与现有 D1 结构逐字段对照                                                        | 与 `migrations/0001–0005` 的建表语句逐表核对无差异；`drizzle-kit check` 通过 |
+| 2.2 | `db/repositories/*`：把 `db.js` 的纯查询按聚合拆开（catalog / orders / proofs / admin），签名不变、逻辑不变               | 现有 Python E2E 全过（行为未变）                                             |
+| 2.3 | drizzle-kit 接管 migrations：从当前 schema 生成基线，`migrations/` 旧 SQL 归档为 `migrations/archive/`，README 写清新流程 | 新库从零 `migrate` 后与线上结构一致（表名、字段、索引逐项比对）              |
+| 2.4 | seed 脚本改写为 TS（`scripts/seed.ts`）：读 `src/data`，写 D1；与旧 `seed.py` 输出逐行比对                                | 同一份 `src/data`，新旧脚本写入的 D1 内容一致                                |
 
 ### 4.3 Phase 3 — 服务层
 
-| # | 任务 | 验收 |
-| --- | --- | --- |
-| 3.1 | `services/orders.ts`：createOrder / getOrder / updateBuyerInfo / cancelOrder / transition；状态机收进 `domain/order.ts`（纯函数：允许的转移、是否可取消、是否过期） | 单元测试覆盖全部状态转移（含非法转移抛错）；E2E 全过 |
-| 3.2 | `services/payments.ts`：submitPaymentProof / confirmPayment / 上传 token（发放/校验/核销）/ addImagePaymentProof；金额校验逻辑不变 | 单元测试覆盖：金额不符拒绝、无凭据拒绝、token 一次有效、过期拒绝 |
-| 3.3 | `services/catalog.ts` / `services/shipping.ts` / `services/admin.ts`：按聚合拆；`totals` 移到 `domain/money.ts`（纯函数单测） | 金额用例全过（68+12=80、128+12=140、免邮 200 边界） |
-| 3.4 | `services/jobs.ts`：expireUnpaidOrders / autoCompleteShipped；定时任务在 workers-pool 里可本地触发验证（不再等线上触发器同步） | 本地测试：回拨时间的订单被取消、发货超 7 天的订单被完成 |
-| 3.5 | 统一错误：`domain/errors.ts`；所有服务抛 DomainError；路由/MCP 翻译层单测 | 错误形状快照测试通过 |
+| #   | 任务                                                                                                                                                                | 验收                                                             |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| 3.1 | `services/orders.ts`：createOrder / getOrder / updateBuyerInfo / cancelOrder / transition；状态机收进 `domain/order.ts`（纯函数：允许的转移、是否可取消、是否过期） | 单元测试覆盖全部状态转移（含非法转移抛错）；E2E 全过             |
+| 3.2 | `services/payments.ts`：submitPaymentProof / confirmPayment / 上传 token（发放/校验/核销）/ addImagePaymentProof；金额校验逻辑不变                                  | 单元测试覆盖：金额不符拒绝、无凭据拒绝、token 一次有效、过期拒绝 |
+| 3.3 | `services/catalog.ts` / `services/shipping.ts` / `services/admin.ts`：按聚合拆；`totals` 移到 `domain/money.ts`（纯函数单测）                                       | 金额用例全过（68+12=80、128+12=140、免邮 200 边界）              |
+| 3.4 | `services/jobs.ts`：expireUnpaidOrders / autoCompleteShipped；定时任务在 workers-pool 里可本地触发验证（不再等线上触发器同步）                                      | 本地测试：回拨时间的订单被取消、发货超 7 天的订单被完成          |
+| 3.5 | 统一错误：`domain/errors.ts`；所有服务抛 DomainError；路由/MCP 翻译层单测                                                                                           | 错误形状快照测试通过                                             |
 
 ### 4.4 Phase 4 — 接入层（路由 + MCP）
 
-| # | 任务 | 验收 |
-| --- | --- | --- |
-| 4.1 | `routes/` 按领域拆 index.js；每个路由只做输入校验（zod）→ 调服务 → 输出 | 路由表与重构前逐条比对（方法、路径、状态码、响应字段） |
+| #   | 任务                                                                                                                        | 验收                                                                            |
+| --- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| 4.1 | `routes/` 按领域拆 index.js；每个路由只做输入校验（zod）→ 调服务 → 输出                                                     | 路由表与重构前逐条比对（方法、路径、状态码、响应字段）                          |
 | 4.2 | `mcp/tools/*`：13 个工具按领域拆文件；工具描述文字原样保留（agent 靠这些文字工作，一字不改）；handler 只做参数校验 → 调服务 | `tools/list` 输出与重构前逐项比对；TEST_PROMPTS.md 的 27 条 prompt 全部重跑通过 |
-| 4.3 | 统一鉴权中间件：后台 API 的 `requireAdmin`、上传 token 校验收进 `routes/middleware.ts`（或 Hono 中间件），消除两处各自实现 | 未授权访问测试：无 key 401、无 token 拒绝、过期 token 拒绝 |
-| 4.4 | 静态文件：`src/static/data.ts` 生成器改写为 TS；店铺文件内容不动 | 全部店铺路由与重构前逐字节比对（compare_routes.py 全过） |
+| 4.3 | 统一鉴权中间件：后台 API 的 `requireAdmin`、上传 token 校验收进 `routes/middleware.ts`（或 Hono 中间件），消除两处各自实现  | 未授权访问测试：无 key 401、无 token 拒绝、过期 token 拒绝                      |
+| 4.4 | 静态文件：`src/static/data.ts` 生成器改写为 TS；店铺文件内容不动                                                            | 全部店铺路由与重构前逐字节比对（compare_routes.py 全过）                        |
 
 ### 4.5 Phase 5 — 前端重写（HonoX，两个页面，见 §5）
 
-| # | 任务 | 验收 |
-| --- | --- | --- |
-| 5.1 | 上传页：`app/routes/shops/[shop]/orders/[id]/upload-proof.tsx`（SSR 壳）+ `app/islands/upload/proof-form.tsx`（倒计时、文件预览、提交）+ 共用 `_renderer.tsx` / `app/style.css` | §5 的验收清单全过；真机浏览器测试通过 |
-| 5.2 | 后台页：`app/routes/shops/[shop]/admin.tsx`（SSR 壳）+ `app/islands/admin/` 四个岛（列表、详情、商品编辑、政策编辑）+ shadcn/ui 组件 | §5 的验收清单全过；真机浏览器测试通过（含登录失败、确认收款金额不符、发货、取消） |
-| 5.3 | 删掉 `ADMIN_HTML` 模板字符串和 `page()` HTML 拼接；全仓 grep 确认没有残留的 HTML 模板字符串；同时删掉 `src/ui/`、`src/client/` 占位（如果 Phase 1–4 建过的话，以 `app/` 为准） | `grep -r "ADMIN_HTML\|<!doctype" src/ app/` 零命中（测试除外） |
-| 5.4 | 旧 Python 测试退役：`tests/test_client.py` / `test_admin.py` 改为仅上线后冒烟（或由 `tests/smoke.ts` 替代）；`compare_routes.py` 保留为比对工具直到 4.4 完成，之后可删 | `npm test` 不再依赖线上；冒烟脚本单独命令 |
-| 5.5 | HonoX 回归：岛之间无互相 import（grep 检查）、`honox-island { display: contents; }` 在样式里、React 岛与 hono/jsx 岛不混写 | 静态检查全过；Phase 0 spike 的验收项在完整版上重跑一遍 |
+| #   | 任务                                                                                                                                                                            | 验收                                                                              |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| 5.1 | 上传页：`app/routes/shops/[shop]/orders/[id]/upload-proof.tsx`（SSR 壳）+ `app/islands/upload/proof-form.tsx`（倒计时、文件预览、提交）+ 共用 `_renderer.tsx` / `app/style.css` | §5 的验收清单全过；真机浏览器测试通过                                             |
+| 5.2 | 后台页：`app/routes/shops/[shop]/admin.tsx`（SSR 壳）+ `app/islands/admin/` 四个岛（列表、详情、商品编辑、政策编辑）+ shadcn/ui 组件                                            | §5 的验收清单全过；真机浏览器测试通过（含登录失败、确认收款金额不符、发货、取消） |
+| 5.3 | 删掉 `ADMIN_HTML` 模板字符串和 `page()` HTML 拼接；全仓 grep 确认没有残留的 HTML 模板字符串；同时删掉 `src/ui/`、`src/client/` 占位（如果 Phase 1–4 建过的话，以 `app/` 为准）  | `grep -r "ADMIN_HTML\|<!doctype" src/ app/` 零命中（测试除外）                    |
+| 5.4 | 旧 Python 测试退役：`tests/test_client.py` / `test_admin.py` 改为仅上线后冒烟（或由 `tests/smoke.ts` 替代）；`compare_routes.py` 保留为比对工具直到 4.4 完成，之后可删          | `npm test` 不再依赖线上；冒烟脚本单独命令                                         |
+| 5.5 | HonoX 回归：岛之间无互相 import（grep 检查）、`honox-island { display: contents; }` 在样式里、React 岛与 hono/jsx 岛不混写                                                      | 静态检查全过；Phase 0 spike 的验收项在完整版上重跑一遍                            |
 
 ### 4.6 Phase 6 — 收尾
 
-| # | 任务 | 验收 |
-| --- | --- | --- |
-| 6.1 | 脚本 TS 化：`update-shop-facts.ts`、`gen-admin-keys.ts`；删 Python 脚本；`scripts/` 只有 TS | 全仓无 `.py`（仓库外 cf.py 不算） |
+| #   | 任务                                                                                                           | 验收                                      |
+| --- | -------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| 6.1 | 脚本 TS 化：`update-shop-facts.ts`、`gen-admin-keys.ts`；删 Python 脚本；`scripts/` 只有 TS                    | 全仓无 `.py`（仓库外 cf.py 不算）         |
 | 6.2 | 文档：README 按新结构重写（命令、目录、部署、测试）；设计文档追加一节（v2.0 架构）；AGENTS.md 更新为重构后状态 | 新 agent 按 README 从零到第一次部署不卡住 |
-| 6.3 | 发版：版本号 1.7.0 → 2.0.0（重构发版，不是功能发版）；线上验证 + 盲测重跑；旧 bundle 保留回滚路径 | §8 验收全过 |
+| 6.3 | 发版：版本号 1.7.0 → 2.0.0（重构发版，不是功能发版）；线上验证 + 盲测重跑；旧 bundle 保留回滚路径              | §8 验收全过                               |
 
 ## 5. 前端重写需求
 

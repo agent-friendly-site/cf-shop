@@ -156,7 +156,10 @@ async function rows<T extends object = Record<string, unknown>>(
   sql: string,
   ...params: unknown[]
 ): Promise<T[]> {
-  const { results } = await db.prepare(sql).bind(...params).all();
+  const { results } = await db
+    .prepare(sql)
+    .bind(...params)
+    .all();
   return (results ?? []) as T[];
 }
 
@@ -173,7 +176,11 @@ export async function listProducts(db: D1Database, shop: string): Promise<Produc
   return rows<Product>(db, "SELECT * FROM products WHERE shop = ? ORDER BY rowid", shop);
 }
 
-export async function getProduct(db: D1Database, shop: string, id: string): Promise<Product | null> {
+export async function getProduct(
+  db: D1Database,
+  shop: string,
+  id: string,
+): Promise<Product | null> {
   return (await db
     .prepare("SELECT * FROM products WHERE shop = ? AND id = ?")
     .bind(shop, id)
@@ -181,7 +188,10 @@ export async function getProduct(db: D1Database, shop: string, id: string): Prom
 }
 
 export async function getPolicies(db: D1Database, shop: string): Promise<ShopPolicies | null> {
-  return (await db.prepare("SELECT * FROM shop_policies WHERE shop = ?").bind(shop).first()) as ShopPolicies | null;
+  return (await db
+    .prepare("SELECT * FROM shop_policies WHERE shop = ?")
+    .bind(shop)
+    .first()) as ShopPolicies | null;
 }
 
 // Allowed transitions: from-status -> [to-statuses]. Every status change
@@ -208,16 +218,43 @@ export async function sha256Hex(text: string): Promise<string> {
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-function writeEvent(db: D1Database, { orderId, event, fromStatus, toStatus, actor, note, now }: { orderId: string; event: string; fromStatus: string | null; toStatus: string | null; actor: string; note: string | null; now: string }) {
+function writeEvent(
+  db: D1Database,
+  {
+    orderId,
+    event,
+    fromStatus,
+    toStatus,
+    actor,
+    note,
+    now,
+  }: {
+    orderId: string;
+    event: string;
+    fromStatus: string | null;
+    toStatus: string | null;
+    actor: string;
+    note: string | null;
+    now: string;
+  },
+) {
   const id = `evt_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   return db
     .prepare(
-      "INSERT INTO order_events (id, order_id, event, from_status, to_status, actor, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+      "INSERT INTO order_events (id, order_id, event, from_status, to_status, actor, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(id, orderId, event, fromStatus ?? null, toStatus ?? null, actor, note || null, now);
 }
 
-export async function transitionOrder(db: D1Database, order: Order, toStatus: OrderStatus, event: string, actor: string, note: string | null, extra: Record<string, unknown> = {}): Promise<Order | null> {
+export async function transitionOrder(
+  db: D1Database,
+  order: Order,
+  toStatus: OrderStatus,
+  event: string,
+  actor: string,
+  note: string | null,
+  extra: Record<string, unknown> = {},
+): Promise<Order | null> {
   const from = order.status;
   if (!(TRANSITIONS[from] || []).includes(toStatus)) {
     throw new DomainRpcError(`order ${order.id} is ${from}; cannot move to ${toStatus}`, -32000);
@@ -231,7 +268,15 @@ export async function transitionOrder(db: D1Database, order: Order, toStatus: Or
   }
   params.push(order.id);
   const update = db.prepare(`UPDATE orders SET ${sets.join(", ")} WHERE id = ?`).bind(...params);
-  const evt = writeEvent(db, { orderId: order.id, event, fromStatus: from, toStatus, actor, note, now });
+  const evt = writeEvent(db, {
+    orderId: order.id,
+    event,
+    fromStatus: from,
+    toStatus,
+    actor,
+    note,
+    now,
+  });
   await db.batch([update, evt]);
   return getOrder(db, order.id);
 }
@@ -240,12 +285,15 @@ export async function listOrderEvents(db: D1Database, orderId: string): Promise<
   return rows<OrderEvent>(
     db,
     "SELECT event, from_status, to_status, actor, note, created_at FROM order_events WHERE order_id = ? ORDER BY created_at, rowid",
-    orderId
+    orderId,
   );
 }
 
 export async function getPayment(db: D1Database, shop: string) {
-  const row = (await db.prepare("SELECT * FROM shop_payment WHERE shop = ?").bind(shop).first()) as {
+  const row = (await db
+    .prepare("SELECT * FROM shop_payment WHERE shop = ?")
+    .bind(shop)
+    .first()) as {
     summary: string;
     never_in_chat_json: string;
     flow_json: string;
@@ -254,7 +302,7 @@ export async function getPayment(db: D1Database, shop: string) {
   const methods = await rows<{ id: string; label: string; instructions: string }>(
     db,
     "SELECT method_id AS id, label, instructions FROM payment_methods WHERE shop = ? ORDER BY rowid",
-    shop
+    shop,
   );
   return {
     shop,
@@ -276,11 +324,15 @@ export async function getRecommendations(db: D1Database, shop: string) {
     best_for: string;
     why: string;
     alternative_if_out: string;
-  }>(db, "SELECT product_id, best_for, why, alternative_if_out FROM recommendations WHERE shop = ? ORDER BY rank", shop);
+  }>(
+    db,
+    "SELECT product_id, best_for, why, alternative_if_out FROM recommendations WHERE shop = ? ORDER BY rank",
+    shop,
+  );
   const bundles = await rows<{ name: string; items_json: string; total_cny: number; note: string }>(
     db,
     "SELECT name, items_json, total_cny, note FROM shop_bundles WHERE shop = ? ORDER BY rowid",
-    shop
+    shop,
   );
   return {
     recs,
@@ -317,7 +369,13 @@ export function totals(items: OrderItemInput[], products: Product[]): OrderTotal
       throw new DomainRpcError(`${p.name_zh || p.name} 库存不足（仅剩 ${p.stock} 件）`, -32000);
     }
     subtotal += p.price * qty;
-    lines.push({ product_id: p.id, name: p.name_zh || p.name, unit_price: p.price, quantity: qty, line_total: p.price * qty });
+    lines.push({
+      product_id: p.id,
+      name: p.name_zh || p.name,
+      unit_price: p.price,
+      quantity: qty,
+      line_total: p.price * qty,
+    });
   }
   const shipping = subtotal >= FREE_SHIPPING_OVER || subtotal === 0 ? 0 : SHIPPING_FLAT;
   const total = subtotal + shipping;
@@ -354,7 +412,9 @@ function orderShape(row: OrderRow, proofs: PaymentProof[], timeline: OrderEvent[
     // Payment deadline (v1.7.0): only pending_payment orders have one.
     payment_expires_at:
       row.status === "pending_payment"
-        ? new Date(new Date(row.created_at).getTime() + UNPAID_EXPIRY_MINUTES * 60 * 1000).toISOString()
+        ? new Date(
+            new Date(row.created_at).getTime() + UNPAID_EXPIRY_MINUTES * 60 * 1000,
+          ).toISOString()
         : null,
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -364,18 +424,25 @@ function orderShape(row: OrderRow, proofs: PaymentProof[], timeline: OrderEvent[
 }
 
 export async function getOrder(db: D1Database, id: string): Promise<Order | null> {
-  const row = (await db.prepare("SELECT * FROM orders WHERE id = ?").bind(id).first()) as OrderRow | null;
+  const row = (await db
+    .prepare("SELECT * FROM orders WHERE id = ?")
+    .bind(id)
+    .first()) as OrderRow | null;
   if (!row) return null;
   const proofs = await rows<PaymentProof>(
     db,
     "SELECT * FROM payment_proofs WHERE order_id = ? ORDER BY created_at",
-    id
+    id,
   );
   const timeline = await listOrderEvents(db, id);
   return orderShape(row, proofs, timeline);
 }
 
-export async function listOrders(db: D1Database, shop: string, { status, limit = 50, offset = 0 }: { status?: string; limit?: number; offset?: number } = {}): Promise<Order[]> {
+export async function listOrders(
+  db: D1Database,
+  shop: string,
+  { status, limit = 50, offset = 0 }: { status?: string; limit?: number; offset?: number } = {},
+): Promise<Order[]> {
   const params: unknown[] = [shop];
   let sql = "SELECT * FROM orders WHERE shop = ?";
   if (status) {
@@ -387,7 +454,11 @@ export async function listOrders(db: D1Database, shop: string, { status, limit =
   const list = await rows<OrderRow>(db, sql, ...params);
   const out = [];
   for (const row of list) {
-    const proofs = await rows<PaymentProof>(db, "SELECT * FROM payment_proofs WHERE order_id = ? ORDER BY created_at", row.id);
+    const proofs = await rows<PaymentProof>(
+      db,
+      "SELECT * FROM payment_proofs WHERE order_id = ? ORDER BY created_at",
+      row.id,
+    );
     out.push(orderShape(row, proofs, []));
   }
   return out;
@@ -397,12 +468,11 @@ export async function orderCounts(db: D1Database, shop: string) {
   const list = await rows<{ status: OrderStatus; n: number }>(
     db,
     "SELECT status, COUNT(*) AS n FROM orders WHERE shop = ? GROUP BY status",
-    shop
+    shop,
   );
-  const counts: Record<OrderStatus, number> = Object.fromEntries(ORDER_STATUSES.map((s) => [s, 0])) as Record<
-    OrderStatus,
-    number
-  >;
+  const counts: Record<OrderStatus, number> = Object.fromEntries(
+    ORDER_STATUSES.map((s) => [s, 0]),
+  ) as Record<OrderStatus, number>;
   let total = 0;
   for (const r of list) {
     counts[r.status] = r.n;
@@ -415,7 +485,6 @@ export async function createOrder(
   db: D1Database,
   {
     shop,
-    items,
     total,
     idempotencyKey,
     buyerNote,
@@ -431,17 +500,23 @@ export async function createOrder(
     buyerName?: string;
     buyerContact?: string;
     shippingAddress?: string;
-  }
+  },
 ) {
   // The shipping address is required at the tool level (v1.5.0): the
   // seller cannot ship without one, so an order without an address
   // cannot be created at all. The MCP schema enforces this first;
   // this check is the second gate for any direct caller.
   if (typeof shippingAddress !== "string" || !shippingAddress.trim()) {
-    throw new DomainRpcError("shipping_address is required: the seller cannot ship without an address", -32602);
+    throw new DomainRpcError(
+      "shipping_address is required: the seller cannot ship without an address",
+      -32602,
+    );
   }
   shippingAddress = shippingAddress.trim();
-  const existing = (await db.prepare("SELECT id FROM orders WHERE idempotency_key = ?").bind(idempotencyKey).first()) as {
+  const existing = (await db
+    .prepare("SELECT id FROM orders WHERE idempotency_key = ?")
+    .bind(idempotencyKey)
+    .first()) as {
     id: string;
   } | null;
   if (existing) return { existing: true, order: await getOrder(db, existing.id) };
@@ -449,11 +524,34 @@ export async function createOrder(
   const id = `ord_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   await db
     .prepare(
-      "INSERT INTO orders (id, shop, items_json, subtotal_cny, shipping_cny, total_cny, status, idempotency_key, buyer_note, buyer_name, buyer_contact, shipping_address, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      "INSERT INTO orders (id, shop, items_json, subtotal_cny, shipping_cny, total_cny, status, idempotency_key, buyer_note, buyer_name, buyer_contact, shipping_address, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
-    .bind(id, shop, JSON.stringify(total.lines), total.subtotal_cny, total.shipping_cny, total.total_cny, "pending_payment", idempotencyKey, buyerNote || null, buyerName || null, buyerContact || null, shippingAddress || null, now, now)
+    .bind(
+      id,
+      shop,
+      JSON.stringify(total.lines),
+      total.subtotal_cny,
+      total.shipping_cny,
+      total.total_cny,
+      "pending_payment",
+      idempotencyKey,
+      buyerNote || null,
+      buyerName || null,
+      buyerContact || null,
+      shippingAddress || null,
+      now,
+      now,
+    )
     .run();
-  await writeEvent(db, { orderId: id, event: "order_created", fromStatus: null, toStatus: "pending_payment", actor: "buyer", note: null, now }).run();
+  await writeEvent(db, {
+    orderId: id,
+    event: "order_created",
+    fromStatus: null,
+    toStatus: "pending_payment",
+    actor: "buyer",
+    note: null,
+    now,
+  }).run();
   return { existing: false, order: await getOrder(db, id) };
 }
 
@@ -464,7 +562,7 @@ export async function addPaymentProof(
     paymentMethod,
     transactionId,
     amountCny,
-  }: { orderId: string; paymentMethod: string; transactionId: string; amountCny: number }
+  }: { orderId: string; paymentMethod: string; transactionId: string; amountCny: number },
 ) {
   const order = await getOrder(db, orderId);
   if (!order) return null;
@@ -473,21 +571,32 @@ export async function addPaymentProof(
   // A proof on an already-paid (or later) order is rejected: the payment
   // is already verified and must not be re-opened by a new proof.
   if (order.status !== "pending_payment" && order.status !== "payment_submitted") {
-    throw new DomainRpcError(`order ${orderId} is already ${order.status}; cannot submit a payment proof`, -32000);
+    throw new DomainRpcError(
+      `order ${orderId} is already ${order.status}; cannot submit a payment proof`,
+      -32000,
+    );
   }
   const wasPending = order.status === "pending_payment";
   const now = new Date().toISOString();
   const id = `proof_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   const insert = db
     .prepare(
-      "INSERT INTO payment_proofs (id, order_id, payment_method, transaction_id, amount_cny, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+      "INSERT INTO payment_proofs (id, order_id, payment_method, transaction_id, amount_cny, created_at) VALUES (?, ?, ?, ?, ?, ?)",
     )
     .bind(id, orderId, paymentMethod, transactionId, amountCny, now);
   if (wasPending) {
     const update = db
       .prepare("UPDATE orders SET status = 'payment_submitted', updated_at = ? WHERE id = ?")
       .bind(now, orderId);
-    const evt = writeEvent(db, { orderId, event: "payment_proof_submitted", fromStatus: "pending_payment", toStatus: "payment_submitted", actor: "buyer", note: `${paymentMethod} ${transactionId}`, now });
+    const evt = writeEvent(db, {
+      orderId,
+      event: "payment_proof_submitted",
+      fromStatus: "pending_payment",
+      toStatus: "payment_submitted",
+      actor: "buyer",
+      note: `${paymentMethod} ${transactionId}`,
+      now,
+    });
     await db.batch([insert, update, evt]);
   } else {
     await insert.run();
@@ -511,7 +620,11 @@ export function proofUploadUrl(shop: string, orderId: string, token: string): st
 
 export async function createProofUploadToken(
   db: D1Database,
-  { shop, orderId, ttlDays = PROOF_UPLOAD_TTL_DAYS }: { shop: string; orderId: string; ttlDays?: number }
+  {
+    shop,
+    orderId,
+    ttlDays = PROOF_UPLOAD_TTL_DAYS,
+  }: { shop: string; orderId: string; ttlDays?: number },
 ) {
   const order = await getOrder(db, orderId);
   if (!order) {
@@ -521,7 +634,10 @@ export async function createProofUploadToken(
     throw new DomainRpcError(`order ${orderId} does not belong to shop ${shop}`, -32602);
   }
   if (!["pending_payment", "payment_submitted"].includes(order.status)) {
-    throw new DomainRpcError(`order ${orderId} is ${order.status}; a payment proof can no longer be uploaded`, -32000);
+    throw new DomainRpcError(
+      `order ${orderId} is ${order.status}; a payment proof can no longer be uploaded`,
+      -32000,
+    );
   }
   // A fresh token on every call: only the hash is stored, so an earlier
   // token cannot be reconstructed. Earlier unused tokens stay valid
@@ -533,7 +649,7 @@ export async function createProofUploadToken(
   const expires = new Date(Date.now() + ttlDays * 24 * 60 * 60 * 1000).toISOString();
   await db
     .prepare(
-      "INSERT INTO proof_upload_tokens (token_hash, shop, order_id, created_at, expires_at, used_at) VALUES (?, ?, ?, ?, ?, NULL)"
+      "INSERT INTO proof_upload_tokens (token_hash, shop, order_id, created_at, expires_at, used_at) VALUES (?, ?, ?, ?, ?, NULL)",
     )
     .bind(await sha256Hex(token), shop, orderId, now, expires)
     .run();
@@ -542,7 +658,7 @@ export async function createProofUploadToken(
 
 export async function verifyProofUploadToken(
   db: D1Database,
-  { shop, orderId, token }: { shop: string; orderId: string; token: string }
+  { shop, orderId, token }: { shop: string; orderId: string; token: string },
 ) {
   if (!token) return null;
   const row = (await db
@@ -594,27 +710,49 @@ export async function addImagePaymentProof(
     r2Key: string;
     transactionId: string | null;
     amountCny: number | null;
-  }
+  },
 ) {
   const order = await getOrder(db, orderId);
   if (!order) return null;
   if (order.status !== "pending_payment" && order.status !== "payment_submitted") {
-    throw new DomainRpcError(`order ${orderId} is already ${order.status}; cannot submit a payment proof`, -32000);
+    throw new DomainRpcError(
+      `order ${orderId} is already ${order.status}; cannot submit a payment proof`,
+      -32000,
+    );
   }
   const wasPending = order.status === "pending_payment";
   const now = new Date().toISOString();
   const id = `proof_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   const insert = db
     .prepare(
-      "INSERT INTO payment_proofs (id, order_id, payment_method, transaction_id, amount_cny, proof_type, r2_key, file_name, mime_type, file_size, created_at) VALUES (?, ?, ?, ?, ?, 'image', ?, ?, ?, ?, ?)"
+      "INSERT INTO payment_proofs (id, order_id, payment_method, transaction_id, amount_cny, proof_type, r2_key, file_name, mime_type, file_size, created_at) VALUES (?, ?, ?, ?, ?, 'image', ?, ?, ?, ?, ?)",
     )
-    .bind(id, orderId, paymentMethod, transactionId || null, amountCny ?? null, r2Key, fileName, mimeType, fileSize, now);
-  const note = `图片凭据 ${fileName}` + (transactionId ? ` · 单号 ${transactionId}` : "");
+    .bind(
+      id,
+      orderId,
+      paymentMethod,
+      transactionId || null,
+      amountCny ?? null,
+      r2Key,
+      fileName,
+      mimeType,
+      fileSize,
+      now,
+    );
+  const note = `图片凭据 ${fileName}${transactionId ? ` · 单号 ${transactionId}` : ""}`;
   if (wasPending) {
     const update = db
       .prepare("UPDATE orders SET status = 'payment_submitted', updated_at = ? WHERE id = ?")
       .bind(now, orderId);
-    const evt = writeEvent(db, { orderId, event: "payment_proof_submitted", fromStatus: "pending_payment", toStatus: "payment_submitted", actor: "buyer", note, now });
+    const evt = writeEvent(db, {
+      orderId,
+      event: "payment_proof_submitted",
+      fromStatus: "pending_payment",
+      toStatus: "payment_submitted",
+      actor: "buyer",
+      note,
+      now,
+    });
     await db.batch([insert, update, evt]);
   } else {
     await insert.run();
@@ -629,20 +767,33 @@ export async function addImagePaymentProof(
 // On success the order becomes paid and the verified amount/time are recorded.
 export async function confirmPayment(
   db: D1Database,
-  { orderId, verifiedAmountCny, note }: { orderId: string; verifiedAmountCny: number; note?: string }
+  {
+    orderId,
+    verifiedAmountCny,
+    note,
+  }: { orderId: string; verifiedAmountCny: number; note?: string },
 ) {
   const order = await getOrder(db, orderId);
   if (!order) {
     throw new DomainRpcError(`unknown order_id: ${orderId}`, -32602);
   }
   if (order.status !== "payment_submitted") {
-    throw new DomainRpcError(`order ${orderId} is ${order.status}, not payment_submitted; only an order awaiting verification can be confirmed`, -32000);
+    throw new DomainRpcError(
+      `order ${orderId} is ${order.status}, not payment_submitted; only an order awaiting verification can be confirmed`,
+      -32000,
+    );
   }
   if (!order.proofs || order.proofs.length === 0) {
-    throw new DomainRpcError(`order ${orderId} has no payment proof; cannot confirm payment`, -32000);
+    throw new DomainRpcError(
+      `order ${orderId} has no payment proof; cannot confirm payment`,
+      -32000,
+    );
   }
   if (verifiedAmountCny !== order.total_cny) {
-    throw new DomainRpcError(`verified amount ${verifiedAmountCny} CNY does not match order total ${order.total_cny} CNY; order stays payment_submitted`, -32000);
+    throw new DomainRpcError(
+      `verified amount ${verifiedAmountCny} CNY does not match order total ${order.total_cny} CNY; order stays payment_submitted`,
+      -32000,
+    );
   }
   const now = new Date().toISOString();
   return transitionOrder(db, order, "paid", "payment_confirmed", "seller", note || null, {
@@ -655,7 +806,11 @@ export async function confirmPayment(
 // Seller-side step: mark a paid order shipped. Only paid -> shipped.
 export async function markShipped(
   db: D1Database,
-  { orderId, carrier, trackingNumber }: { orderId: string; carrier?: string; trackingNumber?: string }
+  {
+    orderId,
+    carrier,
+    trackingNumber,
+  }: { orderId: string; carrier?: string; trackingNumber?: string },
 ) {
   const order = await getOrder(db, orderId);
   if (!order) {
@@ -686,7 +841,7 @@ export async function confirmReceipt(db: D1Database, { orderId }: { orderId: str
 // Only pending_payment / payment_submitted -> cancelled.
 export async function cancelOrder(
   db: D1Database,
-  { orderId, reason, actor = "buyer" }: { orderId: string; reason?: string; actor?: string }
+  { orderId, reason, actor = "buyer" }: { orderId: string; reason?: string; actor?: string },
 ) {
   const order = await getOrder(db, orderId);
   if (!order) {
@@ -714,14 +869,17 @@ export async function updateBuyerInfo(
     buyerName,
     buyerContact,
     shippingAddress,
-  }: { orderId: string; buyerName?: string; buyerContact?: string; shippingAddress?: string }
+  }: { orderId: string; buyerName?: string; buyerContact?: string; shippingAddress?: string },
 ) {
   const order = await getOrder(db, orderId);
   if (!order) {
     throw new DomainRpcError(`unknown order_id: ${orderId}`, -32602);
   }
   if (["shipped", "completed", "cancelled"].includes(order.status)) {
-    throw new DomainRpcError(`order ${orderId} is ${order.status}; buyer info can no longer be changed`, -32000);
+    throw new DomainRpcError(
+      `order ${orderId} is ${order.status}; buyer info can no longer be changed`,
+      -32000,
+    );
   }
   const fields: { col: string; val: string; label: string }[] = [];
   const check = (value: string | undefined, col: string, label: string) => {
@@ -735,7 +893,10 @@ export async function updateBuyerInfo(
   check(buyerContact, "buyer_contact", "联系方式");
   check(shippingAddress, "shipping_address", "收货地址");
   if (fields.length === 0) {
-    throw new DomainRpcError("at least one of buyer_name, buyer_contact, shipping_address is required", -32602);
+    throw new DomainRpcError(
+      "at least one of buyer_name, buyer_contact, shipping_address is required",
+      -32602,
+    );
   }
   const now = new Date().toISOString();
   const sets = ["updated_at = ?"];
@@ -764,12 +925,15 @@ export async function updateBuyerInfo(
 // from the Worker's scheduled() handler (every-minute cron trigger).
 // Each cancellation goes through transitionOrder() so the timeline
 // records it (event auto_cancelled, actor system).
-export async function expireUnpaidOrders(db: D1Database, minutes = UNPAID_EXPIRY_MINUTES): Promise<string[]> {
+export async function expireUnpaidOrders(
+  db: D1Database,
+  minutes = UNPAID_EXPIRY_MINUTES,
+): Promise<string[]> {
   const cutoff = new Date(Date.now() - minutes * 60 * 1000).toISOString();
   const stale = await rows<OrderRow>(
     db,
     "SELECT * FROM orders WHERE status = 'pending_payment' AND created_at < ? ORDER BY created_at",
-    cutoff
+    cutoff,
   );
   const cancelled: string[] = [];
   for (const row of stale) {
@@ -789,21 +953,32 @@ export async function expireUnpaidOrders(db: D1Database, minutes = UNPAID_EXPIRY
 // Daily scheduled job: auto-complete orders shipped more than
 // AUTO_COMPLETE_AFTER_DAYS ago with no buyer confirmation.
 // Old orders without shipped_at are never auto-completed.
-export async function autoCompleteShipped(db: D1Database, days = AUTO_COMPLETE_AFTER_DAYS): Promise<string[]> {
+export async function autoCompleteShipped(
+  db: D1Database,
+  days = AUTO_COMPLETE_AFTER_DAYS,
+): Promise<string[]> {
   const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
   const stale = await rows<{ id: string }>(
     db,
     "SELECT * FROM orders WHERE status = 'shipped' AND shipped_at IS NOT NULL AND shipped_at < ? ORDER BY shipped_at",
-    cutoff
+    cutoff,
   );
   const completed: string[] = [];
   for (const row of stale) {
     const order = await getOrder(db, row.id);
     if (!order) continue;
     const now = new Date().toISOString();
-    const done = await transitionOrder(db, order, "completed", "auto_completed", "system", `发货满 ${days} 天未确认收货，自动完成`, {
-      completed_at: now,
-    });
+    const done = await transitionOrder(
+      db,
+      order,
+      "completed",
+      "auto_completed",
+      "system",
+      `发货满 ${days} 天未确认收货，自动完成`,
+      {
+        completed_at: now,
+      },
+    );
     if (done) completed.push(done.id);
   }
   return completed;
@@ -815,14 +990,17 @@ export async function setAdminKey(db: D1Database, shop: string, keyHash: string)
   const now = new Date().toISOString();
   await db
     .prepare(
-      "INSERT INTO shop_admin_keys (shop, key_hash, created_at) VALUES (?, ?, ?) ON CONFLICT(shop) DO UPDATE SET key_hash = excluded.key_hash, created_at = excluded.created_at, last_used_at = NULL"
+      "INSERT INTO shop_admin_keys (shop, key_hash, created_at) VALUES (?, ?, ?) ON CONFLICT(shop) DO UPDATE SET key_hash = excluded.key_hash, created_at = excluded.created_at, last_used_at = NULL",
     )
     .bind(shop, keyHash, now)
     .run();
 }
 
 export async function verifyAdminKey(db: D1Database, shop: string, key: string): Promise<boolean> {
-  const row = (await db.prepare("SELECT key_hash FROM shop_admin_keys WHERE shop = ?").bind(shop).first()) as {
+  const row = (await db
+    .prepare("SELECT key_hash FROM shop_admin_keys WHERE shop = ?")
+    .bind(shop)
+    .first()) as {
     key_hash: string;
   } | null;
   if (!row) return false;
@@ -842,7 +1020,9 @@ export async function createAdminSession(db: D1Database, shop: string) {
   const now = new Date().toISOString();
   const expires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
   await db
-    .prepare("INSERT INTO admin_sessions (token_hash, shop, created_at, expires_at) VALUES (?, ?, ?, ?)")
+    .prepare(
+      "INSERT INTO admin_sessions (token_hash, shop, created_at, expires_at) VALUES (?, ?, ?, ?)",
+    )
     .bind(await sha256Hex(token), shop, now, expires)
     .run();
   return { token, expires };
@@ -861,14 +1041,17 @@ export async function getSessionShop(db: D1Database, token: string): Promise<str
 
 export async function deleteAdminSession(db: D1Database, token: string): Promise<void> {
   if (!token) return;
-  await db.prepare("DELETE FROM admin_sessions WHERE token_hash = ?").bind(await sha256Hex(token)).run();
+  await db
+    .prepare("DELETE FROM admin_sessions WHERE token_hash = ?")
+    .bind(await sha256Hex(token))
+    .run();
 }
 
 export async function updateProduct(
   db: D1Database,
   shop: string,
   id: string,
-  { price, stock }: { price?: number; stock?: number }
+  { price, stock }: { price?: number; stock?: number },
 ) {
   const p = await getProduct(db, shop, id);
   if (!p) {
@@ -894,7 +1077,10 @@ export async function updateProduct(
     throw new DomainRpcError("nothing to update: send price_cny and/or stock", -32602);
   }
   params.push(shop, id);
-  await db.prepare(`UPDATE products SET ${sets.join(", ")} WHERE shop = ? AND id = ?`).bind(...params).run();
+  await db
+    .prepare(`UPDATE products SET ${sets.join(", ")} WHERE shop = ? AND id = ?`)
+    .bind(...params)
+    .run();
   return getProduct(db, shop, id);
 }
 
@@ -922,7 +1108,10 @@ export async function updatePolicies(db: D1Database, shop: string, patch: Record
   }
   if (sets.length > 0) {
     params.push(shop);
-    await db.prepare(`UPDATE shop_policies SET ${sets.join(", ")} WHERE shop = ?`).bind(...params).run();
+    await db
+      .prepare(`UPDATE shop_policies SET ${sets.join(", ")} WHERE shop = ?`)
+      .bind(...params)
+      .run();
   }
   return getPolicies(db, shop);
 }
@@ -930,7 +1119,7 @@ export async function updatePolicies(db: D1Database, shop: string, patch: Record
 export async function updatePaymentMethods(
   db: D1Database,
   shop: string,
-  methods: { id: string; instructions: string }[] | undefined
+  methods: { id: string; instructions: string }[] | undefined,
 ) {
   // methods: [{id, instructions}] — only instructions are editable.
   for (const m of methods || []) {

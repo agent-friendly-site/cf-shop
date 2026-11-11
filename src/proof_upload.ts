@@ -17,8 +17,8 @@
 // Uploaded images are private in R2; the seller views them through
 // the authenticated admin image endpoint in src/admin.js.
 import type { Hono } from "hono";
-import type { Env } from "./env";
 import * as db from "./db";
+import type { Env } from "./env";
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 type AppEnv = { Bindings: Env };
@@ -48,7 +48,8 @@ export function registerProofUploadRoutes(app: Hono<AppEnv>) {
     const orderId = c.req.param("id");
     const token = c.req.query("token") || "";
     const shop = await db.getShop(c.env.DB, slug);
-    if (!shop) return c.html(page("店铺不存在", `<h1>店铺不存在</h1><p>未知店铺：${esc(slug)}</p>`), 404);
+    if (!shop)
+      return c.html(page("店铺不存在", `<h1>店铺不存在</h1><p>未知店铺：${esc(slug)}</p>`), 404);
     const order = await db.getOrder(c.env.DB, orderId);
     if (!order || order.shop !== slug) {
       return c.html(page("订单不存在", `<h1>订单不存在</h1><p>未知订单：${esc(orderId)}</p>`), 404);
@@ -56,21 +57,26 @@ export function registerProofUploadRoutes(app: Hono<AppEnv>) {
     const valid = await db.verifyProofUploadToken(c.env.DB, { shop: slug, orderId, token });
     if (!valid) {
       return c.html(
-        page("链接无效",
-          `<h1 class="err">这个上传链接无效</h1><p>链接可能已过期（7 天有效期）、已经用过（一次有效），或者地址不对。</p><p>请重新向你的 Agent 要一个新的上传链接。</p>`),
-        403
+        page(
+          "链接无效",
+          `<h1 class="err">这个上传链接无效</h1><p>链接可能已过期（7 天有效期）、已经用过（一次有效），或者地址不对。</p><p>请重新向你的 Agent 要一个新的上传链接。</p>`,
+        ),
+        403,
       );
     }
     if (!["pending_payment", "payment_submitted"].includes(order.status)) {
       return c.html(
-        page("订单已不需要凭据",
-          `<h1>这个订单已经不需要付款凭据了</h1><p>订单 ${esc(order.id)} 当前状态是 ${esc(order.status)}。</p>`),
-        400
+        page(
+          "订单已不需要凭据",
+          `<h1>这个订单已经不需要付款凭据了</h1><p>订单 ${esc(order.id)} 当前状态是 ${esc(order.status)}。</p>`,
+        ),
+        400,
       );
     }
     const items = order.items.map((it) => `${esc(it.name)} × ${it.quantity}`).join("、");
     return c.html(
-      page("上传付款截图",
+      page(
+        "上传付款截图",
         `<h1>上传付款截图</h1>
         <div class="card">
           <div>${esc(shop.name_zh || shop.name)}</div>
@@ -94,7 +100,8 @@ export function registerProofUploadRoutes(app: Hono<AppEnv>) {
           <input name="file" id="file" type="file" accept="image/*" required>
           <button type="submit">提交付款截图</button>
         </form>
-        <p class="muted">图片只发给卖家核验用。链接一次有效，7 天内有效；提交后订单变为“待核验”，卖家核对到账和金额后发货，你的 Agent 会在状态变化时通知你。</p>`)
+        <p class="muted">图片只发给卖家核验用。链接一次有效，7 天内有效；提交后订单变为“待核验”，卖家核对到账和金额后发货，你的 Agent 会在状态变化时通知你。</p>`,
+      ),
     );
   });
 
@@ -111,37 +118,66 @@ export function registerProofUploadRoutes(app: Hono<AppEnv>) {
     const tokenRow = await db.verifyProofUploadToken(c.env.DB, { shop: slug, orderId, token });
     if (!tokenRow) {
       return c.html(
-        page("链接无效",
-          `<h1 class="err">这个上传链接无效</h1><p>链接可能已过期、已经用过，或者地址不对。请重新向你的 Agent 要一个新的上传链接。</p>`),
-        403
+        page(
+          "链接无效",
+          `<h1 class="err">这个上传链接无效</h1><p>链接可能已过期、已经用过，或者地址不对。请重新向你的 Agent 要一个新的上传链接。</p>`,
+        ),
+        403,
       );
     }
     if (!["pending_payment", "payment_submitted"].includes(order.status)) {
-      return c.html(page("订单已不需要凭据", `<h1>这个订单已经不需要付款凭据了</h1><p>当前状态：${esc(order.status)}</p>`), 400);
+      return c.html(
+        page(
+          "订单已不需要凭据",
+          `<h1>这个订单已经不需要付款凭据了</h1><p>当前状态：${esc(order.status)}</p>`,
+        ),
+        400,
+      );
     }
-    let body;
+    let body: Awaited<ReturnType<typeof c.req.parseBody>>;
     try {
       body = await c.req.parseBody();
     } catch {
-      return c.html(page("上传失败", `<h1 class="err">上传失败</h1><p>表单解析失败，请重试。</p>`), 400);
+      return c.html(
+        page("上传失败", `<h1 class="err">上传失败</h1><p>表单解析失败，请重试。</p>`),
+        400,
+      );
     }
     const rawFile = body.file;
     if (!rawFile || typeof rawFile === "string" || rawFile.size === 0) {
-      return c.html(page("上传失败", `<h1 class="err">请选择一张付款截图</h1><p>没有收到图片文件。</p>`), 400);
+      return c.html(
+        page("上传失败", `<h1 class="err">请选择一张付款截图</h1><p>没有收到图片文件。</p>`),
+        400,
+      );
     }
     const file = rawFile;
     if (file.size > MAX_FILE_BYTES) {
-      return c.html(page("上传失败", `<h1 class="err">图片太大了</h1><p>请上传 5MB 以内的图片。</p>`), 400);
+      return c.html(
+        page("上传失败", `<h1 class="err">图片太大了</h1><p>请上传 5MB 以内的图片。</p>`),
+        400,
+      );
     }
     const mime = (file.type || "").toLowerCase();
     let ext: string | undefined = ALLOWED_MIME[mime];
     if (!ext) {
       // Some browsers send an empty MIME type; fall back to the extension.
       const m = /\.([a-zA-Z0-9]+)$/.exec(file.name || "");
-      const byExt: Record<string, string> = { jpg: "jpg", jpeg: "jpg", png: "png", webp: "webp", gif: "gif" };
+      const byExt: Record<string, string> = {
+        jpg: "jpg",
+        jpeg: "jpg",
+        png: "png",
+        webp: "webp",
+        gif: "gif",
+      };
       ext = m ? byExt[m[1].toLowerCase()] : undefined;
       if (!ext) {
-        return c.html(page("上传失败", `<h1 class="err">只接受图片文件</h1><p>请上传 JPG / PNG / WebP / GIF 格式的付款截图。</p>`), 400);
+        return c.html(
+          page(
+            "上传失败",
+            `<h1 class="err">只接受图片文件</h1><p>请上传 JPG / PNG / WebP / GIF 格式的付款截图。</p>`,
+          ),
+          400,
+        );
       }
     }
     const paymentMethodRaw = body.payment_method;
@@ -155,11 +191,19 @@ export function registerProofUploadRoutes(app: Hono<AppEnv>) {
     const amountCny = Number.isFinite(amountRaw) && amountRaw > 0 ? amountRaw : null;
 
     if (!ext) {
-      return c.html(page("上传失败", `<h1 class="err">只接受图片文件</h1><p>请上传 JPG / PNG / WebP / GIF 格式的付款截图。</p>`), 400);
+      return c.html(
+        page(
+          "上传失败",
+          `<h1 class="err">只接受图片文件</h1><p>请上传 JPG / PNG / WebP / GIF 格式的付款截图。</p>`,
+        ),
+        400,
+      );
     }
     const key = `proofs/${slug}/${orderId}/${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}.${ext}`;
     const bytes = await file.arrayBuffer();
-    await c.env.PROOFS.put(key, bytes, { httpMetadata: { contentType: `image/${ext === "jpg" ? "jpeg" : ext}` } });
+    await c.env.PROOFS.put(key, bytes, {
+      httpMetadata: { contentType: `image/${ext === "jpg" ? "jpeg" : ext}` },
+    });
     await db.addImagePaymentProof(c.env.DB, {
       orderId,
       paymentMethod: method,
@@ -172,7 +216,8 @@ export function registerProofUploadRoutes(app: Hono<AppEnv>) {
     });
     await db.consumeProofUploadToken(c.env.DB, tokenRow.token_hash);
     return c.html(
-      page("凭据已提交",
+      page(
+        "凭据已提交",
         `<h1 class="ok">付款截图已提交</h1>
         <div class="card">
           <div>订单：${esc(order.id)}</div>
@@ -180,7 +225,8 @@ export function registerProofUploadRoutes(app: Hono<AppEnv>) {
           <div>应付：<b>${order.total_cny} 元</b></div>
           <div>状态：待核验（payment_submitted）</div>
         </div>
-        <p>卖家核对到账和金额后会发货。你的 Agent 会在订单状态变化时通知你，不用再来这里查。</p>`)
+        <p>卖家核对到账和金额后会发货。你的 Agent 会在订单状态变化时通知你，不用再来这里查。</p>`,
+      ),
     );
   });
 }
