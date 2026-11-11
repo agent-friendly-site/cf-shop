@@ -5,14 +5,21 @@
 // (24h, token hash in admin_sessions). Plaintext keys are never stored.
 // Admin routes are intentionally NOT listed in llms.txt / agent.json:
 // the admin is for the human seller, not for buyers' agents.
-import * as db from "./db.js";
+import type { Context, Hono } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
+import type { Order, ShopPolicies } from "./db";
+import * as db from "./db";
+import type { Env } from "./env";
 
-function json(c, obj, status = 200) {
+type AppEnv = { Bindings: Env };
+type AppContext = Context<AppEnv>;
+
+function json(c: AppContext, obj: unknown, status: ContentfulStatusCode = 200) {
   return c.json(obj, status);
 }
 
-function parseCookies(c) {
-  const out = {};
+function parseCookies(c: AppContext): Record<string, string> {
+  const out: Record<string, string> = {};
   const header = c.req.header("Cookie") || "";
   for (const part of header.split(";")) {
     const i = part.indexOf("=");
@@ -21,7 +28,11 @@ function parseCookies(c) {
   return out;
 }
 
-async function requireAdmin(c, shop) {
+function errMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
+async function requireAdmin(c: AppContext, shop: string) {
   const auth = c.req.header("Authorization") || "";
   if (auth.startsWith("Bearer ")) {
     if (await db.verifyAdminKey(c.env.DB, shop, auth.slice(7))) return true;
@@ -31,19 +42,19 @@ async function requireAdmin(c, shop) {
   return false;
 }
 
-function unauthorized(c) {
+function unauthorized(c: AppContext) {
   return json(c, { error: "admin authentication required: log in with the shop admin key" }, 401);
 }
 
-async function body(c) {
+async function body(c: AppContext): Promise<Record<string, unknown>> {
   try {
-    return await c.req.json();
+    return (await c.req.json()) as Record<string, unknown>;
   } catch {
     return {};
   }
 }
 
-function orderSummary(o) {
+function orderSummary(o: Order) {
   return {
     id: o.id,
     shop: o.shop,
@@ -71,18 +82,23 @@ function orderSummary(o) {
   };
 }
 
-function policyShape(pol) {
+function policyShape(pol: ShopPolicies | null) {
   if (!pol) return null;
-  return { ...pol, order_statuses: JSON.parse(pol.order_statuses || "[]") };
+  return { ...pol, order_statuses: JSON.parse(pol.order_statuses || "[]") as unknown[] };
 }
 
-export function registerAdminRoutes(app) {
+export function registerAdminRoutes(app: Hono<AppEnv>) {
   // --- admin web UI (login form + dashboard). The page itself is public;
   // every API call behind it requires auth.
   app.get("/shops/:shop/admin/", async (c) => {
     const shop = await db.getShop(c.env.DB, c.req.param("shop"));
     if (!shop) return json(c, { error: `unknown shop: ${c.req.param("shop")}` }, 404);
-    return c.html(ADMIN_HTML.replaceAll("__SHOP__", shop.slug).replaceAll("__SHOP_NAME__", escapeHtml(shop.name_zh || shop.name)));
+    return c.html(
+      ADMIN_HTML.replaceAll("__SHOP__", shop.slug).replaceAll(
+        "__SHOP_NAME__",
+        escapeHtml(shop.name_zh || shop.name),
+      ),
+    );
   });
   app.get("/shops/:shop/admin", (c) => c.redirect(`/shops/${c.req.param("shop")}/admin/`, 301));
 
@@ -93,14 +109,14 @@ export function registerAdminRoutes(app) {
     const shop = await db.getShop(c.env.DB, slug);
     if (!shop) return json(c, { error: `unknown shop: ${slug}` }, 404);
     const { key } = await body(c);
-    if (!key || !(await db.verifyAdminKey(c.env.DB, slug, key))) {
+    if (typeof key !== "string" || !key || !(await db.verifyAdminKey(c.env.DB, slug, key))) {
       return json(c, { error: "wrong admin key" }, 401);
     }
     const { token, expires } = await db.createAdminSession(c.env.DB, slug);
     const res = json(c, { shop: slug, expires });
     res.headers.set(
       "Set-Cookie",
-      `af_admin=${token}; Path=/shops/${slug}/admin/; HttpOnly; Secure; SameSite=Lax; Max-Age=86400`
+      `af_admin=${token}; Path=/shops/${slug}/admin/; HttpOnly; Secure; SameSite=Lax; Max-Age=86400`,
     );
     return res;
   });
@@ -111,7 +127,7 @@ export function registerAdminRoutes(app) {
     const res = json(c, { ok: true });
     res.headers.set(
       "Set-Cookie",
-      `af_admin=; Path=/shops/${slug}/admin/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`
+      `af_admin=; Path=/shops/${slug}/admin/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`,
     );
     return res;
   });
@@ -149,7 +165,7 @@ export function registerAdminRoutes(app) {
     const order = await db.getOrder(c.env.DB, c.req.param("id"));
     if (!order || order.shop !== slug) return json(c, { error: "unknown order" }, 404);
     const proof = (order.proofs || []).find((p) => p.id === c.req.param("proofId"));
-    if (!proof || proof.proof_type !== "image" || !proof.r2_key) {
+    if (proof?.proof_type !== "image" || !proof.r2_key) {
       return json(c, { error: "no image proof" }, 404);
     }
     const obj = await c.env.PROOFS.get(proof.r2_key);
@@ -171,12 +187,12 @@ export function registerAdminRoutes(app) {
     try {
       const done = await db.confirmPayment(c.env.DB, {
         orderId: order.id,
-        verifiedAmountCny: verified_amount_cny,
-        note,
+        verifiedAmountCny: Number(verified_amount_cny),
+        note: typeof note === "string" ? note : undefined,
       });
-      return json(c, { order: orderSummary(done) });
+      return json(c, { order: done ? orderSummary(done) : null });
     } catch (e) {
-      return json(c, { error: e.message }, 400);
+      return json(c, { error: errMessage(e) }, 400);
     }
   });
 
@@ -189,12 +205,12 @@ export function registerAdminRoutes(app) {
     try {
       const done = await db.markShipped(c.env.DB, {
         orderId: order.id,
-        carrier,
-        trackingNumber: tracking_number,
+        carrier: typeof carrier === "string" ? carrier : undefined,
+        trackingNumber: typeof tracking_number === "string" ? tracking_number : undefined,
       });
-      return json(c, { order: orderSummary(done) });
+      return json(c, { order: done ? orderSummary(done) : null });
     } catch (e) {
-      return json(c, { error: e.message }, 400);
+      return json(c, { error: errMessage(e) }, 400);
     }
   });
 
@@ -205,10 +221,14 @@ export function registerAdminRoutes(app) {
     if (!order || order.shop !== slug) return json(c, { error: "unknown order" }, 404);
     const { reason } = await body(c);
     try {
-      const done = await db.cancelOrder(c.env.DB, { orderId: order.id, reason, actor: "seller" });
-      return json(c, { order: orderSummary(done) });
+      const done = await db.cancelOrder(c.env.DB, {
+        orderId: order.id,
+        reason: typeof reason === "string" ? reason : undefined,
+        actor: "seller",
+      });
+      return json(c, { order: done ? orderSummary(done) : null });
     } catch (e) {
-      return json(c, { error: e.message }, 400);
+      return json(c, { error: errMessage(e) }, 400);
     }
   });
 
@@ -225,12 +245,12 @@ export function registerAdminRoutes(app) {
     const { price_cny, stock } = await body(c);
     try {
       const p = await db.updateProduct(c.env.DB, slug, c.req.param("id"), {
-        price: price_cny,
-        stock,
+        price: typeof price_cny === "number" ? price_cny : Number(price_cny),
+        stock: typeof stock === "number" ? stock : Number(stock),
       });
       return json(c, { product: p });
     } catch (e) {
-      return json(c, { error: e.message }, 400);
+      return json(c, { error: errMessage(e) }, 400);
     }
   });
 
@@ -250,17 +270,25 @@ export function registerAdminRoutes(app) {
       const pol = await db.updatePolicies(c.env.DB, slug, patch);
       let payment = await db.getPayment(c.env.DB, slug);
       if (patch.payment_methods) {
-        payment = await db.updatePaymentMethods(c.env.DB, slug, patch.payment_methods);
+        payment = await db.updatePaymentMethods(
+          c.env.DB,
+          slug,
+          patch.payment_methods as { id: string; instructions: string }[],
+        );
       }
       return json(c, { shop: slug, policies: policyShape(pol), payment: payment?.payment || null });
     } catch (e) {
-      return json(c, { error: e.message }, 400);
+      return json(c, { error: errMessage(e) }, 400);
     }
   });
 }
 
-function escapeHtml(s) {
-  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+function escapeHtml(s: string) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 // Platform-owned admin page (not merchant markup). Plain HTML + fetch,

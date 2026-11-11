@@ -3,8 +3,8 @@
 // GitHub Pages shop files, host rewritten to this Worker).
 
 import index_html from "./data/index.html";
-import llms_full_txt from "./data/llms-full.txt";
 import llms_txt from "./data/llms.txt";
+import llms_full_txt from "./data/llms-full.txt";
 import openapi_json from "./data/openapi.json";
 import robots_txt from "./data/robots.txt";
 import shops_bean_bloom_agent_json from "./data/shops/bean-bloom/agent.json";
@@ -15,8 +15,8 @@ import shops_bean_bloom_api_products_json from "./data/shops/bean-bloom/api/prod
 import shops_bean_bloom_api_recommendations_json from "./data/shops/bean-bloom/api/recommendations.json";
 import shops_bean_bloom_guide_md from "./data/shops/bean-bloom/guide.md";
 import shops_bean_bloom_index_html from "./data/shops/bean-bloom/index.html";
-import shops_bean_bloom_llms_full_txt from "./data/shops/bean-bloom/llms-full.txt";
 import shops_bean_bloom_llms_txt from "./data/shops/bean-bloom/llms.txt";
+import shops_bean_bloom_llms_full_txt from "./data/shops/bean-bloom/llms-full.txt";
 import shops_bean_bloom_mcp_json from "./data/shops/bean-bloom/mcp.json";
 import shops_bean_bloom_openapi_json from "./data/shops/bean-bloom/openapi.json";
 import shops_bean_bloom_policies_json from "./data/shops/bean-bloom/policies.json";
@@ -30,8 +30,8 @@ import shops_paper_lantern_api_products_json from "./data/shops/paper-lantern/ap
 import shops_paper_lantern_api_recommendations_json from "./data/shops/paper-lantern/api/recommendations.json";
 import shops_paper_lantern_guide_md from "./data/shops/paper-lantern/guide.md";
 import shops_paper_lantern_index_html from "./data/shops/paper-lantern/index.html";
-import shops_paper_lantern_llms_full_txt from "./data/shops/paper-lantern/llms-full.txt";
 import shops_paper_lantern_llms_txt from "./data/shops/paper-lantern/llms.txt";
+import shops_paper_lantern_llms_full_txt from "./data/shops/paper-lantern/llms-full.txt";
 import shops_paper_lantern_mcp_json from "./data/shops/paper-lantern/mcp.json";
 import shops_paper_lantern_openapi_json from "./data/shops/paper-lantern/openapi.json";
 import shops_paper_lantern_policies_json from "./data/shops/paper-lantern/policies.json";
@@ -45,8 +45,8 @@ import shops_terra_pots_api_products_json from "./data/shops/terra-pots/api/prod
 import shops_terra_pots_api_recommendations_json from "./data/shops/terra-pots/api/recommendations.json";
 import shops_terra_pots_guide_md from "./data/shops/terra-pots/guide.md";
 import shops_terra_pots_index_html from "./data/shops/terra-pots/index.html";
-import shops_terra_pots_llms_full_txt from "./data/shops/terra-pots/llms-full.txt";
 import shops_terra_pots_llms_txt from "./data/shops/terra-pots/llms.txt";
+import shops_terra_pots_llms_full_txt from "./data/shops/terra-pots/llms-full.txt";
 import shops_terra_pots_mcp_json from "./data/shops/terra-pots/mcp.json";
 import shops_terra_pots_openapi_json from "./data/shops/terra-pots/openapi.json";
 import shops_terra_pots_policies_json from "./data/shops/terra-pots/policies.json";
@@ -112,4 +112,9 @@ export const DATA_FILES = {
   "well-known-agent.json": well_known_agent_json,
 };
 
-export function dataFile(rel) { return DATA_FILES[rel]; }
+type DataFileValue = string | Record<string, unknown>;
+type DataFileKey = keyof typeof DATA_FILES;
+
+export function dataFile(rel: string): DataFileValue | undefined {
+  return DATA_FILES[rel as DataFileKey];
+}

@@ -17,9 +17,6 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-sys.path.insert(0, "/opt/muse/skills/custom-connector-setup/bin")
-from dynamic_credentials import add_surrogate_to_request, read_json_response
-
 BASE = "https://api.cloudflare.com"
 CRED = "custom.cloudflare"
 HOSTS = ["api.cloudflare.com"]
@@ -36,6 +33,9 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 def run_one(account, db, stmt):
     """One statement via D1 /query (the /batch endpoint 404s on this account,
     so statements are executed one at a time)."""
+    # Muse surrogate credentials are only needed for the live API path.
+    sys.path.insert(0, "/opt/muse/skills/custom-connector-setup/bin")
+    from dynamic_credentials import add_surrogate_to_request, read_json_response
     url = f"{BASE}/client/v4/accounts/{account}/d1/database/{db}/query"
     body = json.dumps({"sql": stmt["sql"], "params": stmt["params"]}).encode()
     req = urllib.request.Request(
@@ -108,12 +108,27 @@ def build_statements(migrate_order_path):
 
 
 if __name__ == "__main__":
+    # Phase 2.4: --dump prints data statements only (no migrations / no D1)
+    # so scripts/seed.ts --dump can be compared line-for-line.
+    if len(sys.argv) >= 2 and sys.argv[1] == "--dump":
+        order_path = sys.argv[3] if len(sys.argv) > 3 and sys.argv[2] == "--migrate-order" else None
+        for stmt in build_statements(order_path):
+            # separators match JSON.stringify (no spaces) for line diffs.
+            print(json.dumps(stmt, ensure_ascii=False, separators=(",", ":")))
+        raise SystemExit(0)
     account, db = sys.argv[1], sys.argv[2]
     order_path = sys.argv[4] if len(sys.argv) > 4 and sys.argv[3] == "--migrate-order" else None
+    # Prefer drizzle/ (Phase 2.3); fall back to migrations/*.sql for old checkouts.
+    mig_dir = ROOT / "drizzle"
+    mig_files = sorted(mig_dir.glob("*.sql")) if mig_dir.is_dir() else []
+    if not mig_files:
+        mig_files = sorted((ROOT / "migrations").glob("*.sql"))
     schema_stmts = []
-    for mig in sorted((ROOT / "migrations").glob("*.sql")):
+    for mig in mig_files:
         schema = mig.read_text(encoding="utf-8")
-        schema = "\n".join(l for l in schema.splitlines() if not l.strip().startswith("--"))
+        schema = "\n".join(l for l in schema.splitlines()
+                           if not l.strip().startswith("--")
+                           and "statement-breakpoint" not in l)
         schema_stmts += [{"sql": s.strip(), "params": []}
                          for s in schema.split(";") if s.strip()]
         print(f"migration {mig.name}: {len(schema_stmts)} statements so far")

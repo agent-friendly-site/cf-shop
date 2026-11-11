@@ -8,21 +8,38 @@
   "scripts": {
     "import-data": "python3 scripts/import_data.py",
     "gen-data": "python3 scripts/gen_data_module.py",
-    "seed": "python3 scripts/seed.py",
+    "seed": "npx tsx scripts/seed.ts",
+    "seed:py": "python3 scripts/seed.py",
     "build": "node scripts/build.mjs",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate:local": "wrangler d1 migrations apply agent-friendly-orders --local",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "format": "biome check --write .",
     "dev": "wrangler dev",
-    "test": "python3 tests/test_client.py"
+    "test": "vitest run",
+    "test:e2e": "python3 tests/test_client.py",
+    "test:watch": "vitest"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
+    "drizzle-orm": "^0.44.2",
     "hono": "^4.13.17",
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.6.6",
+    "@cloudflare/vitest-plugin": "^1.7.0",
+    "@cloudflare/workers-types": "^5.20261110.1",
+    "@types/node": "^22.20.5",
+    "drizzle-kit": "^0.31.5",
     "esbuild": "^0.28.2",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.2",
+    "vitest": "^4.1.0",
     "wrangler": "^4.160.0"
   },
   "type": "module"
