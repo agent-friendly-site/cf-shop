@@ -21,12 +21,13 @@ terra-pots（陶土）。价格、政策、状态机见 `docs/refactor-plan.md` 
 npm install          # 装依赖
 npm run build        # esbuild 打包到 dist/worker.mjs
 npm run dev          # wrangler dev 本地开发
-npm test             # 线上 E2E（Python + curl 打线上 Worker）
+npm test             # 本地 Vitest（workers-pool / vitest-plugin + D1）
+npm run test:e2e     # 线上 E2E（Python + curl 打线上 Worker）
 npm run seed         # 从 src/data 同步商品/政策到 D1（要账号和库 ID 参数）
 ```
 
 部署：Phase 0 已验证，走 `npx wrangler deploy`（见“部署”一节）；cf.py 仅兜底。
-测试：`tests/test_client.py`（MCP 全流程）、`tests/test_admin.py`（后台）。
+测试：`npm test` 本地；线上冒烟仍用 `npm run test:e2e` / `tests/test_admin.py`。
 
 ## 目录
 
@@ -119,8 +120,9 @@ tsconfig.json      TypeScript strict
 
 - v1.7.0 已上线：15 分钟未付款自动取消、上传链接交截图、卖家核验、
   跟踪 + 后台管理。全部功能见 `README.md` 的版本记录。
-- 进行中：`docs/refactor-plan.md` 的 v2.0 重构。**Phase 0 / 1.1 / 1.2 已完成**
-  （TS strict + Biome：`npm run typecheck` / `npm run lint`）。下一步 Phase 1.5 Vitest。
+- 进行中：`docs/refactor-plan.md` 的 v2.0 重构。**Phase 0 + Phase 1 已完成**
+  （wrangler、HonoX spike、TS strict、Biome、Vitest 本地 D1）。下一步 Phase 2 Drizzle。
   前端已定 HonoX 0.1.62（pin 死）+ React 渲染器 + Tailwind v4 + shadcn/ui；
   只接后台和上传页，API/MCP 不迁文件路由。接手时先读计划，按阶段做，不要跳阶段。
+  注：`@cloudflare/vitest-pool-workers` 已更名为 `@cloudflare/vitest-plugin`，Phase 1.5 用后者。
 - 待 Hall 手动做的事：关 GitHub Pages；在真机上点一遍后台和上传页（Phase 5 检查点）。

@@ -1,9 +1,12 @@
 # 重构计划 — agent-friendly-platform v2.0（Hono + TS）
 
-> 状态：**Phase 0 / 1.1 / 1.2 已完成（2026-11-11）**（TS strict + Biome）。
-> 下一步 1.5 Vitest workers-pool。本文是重构的需求文档；Phase 0 结论见 §2.2 末尾。
-> 执行时每个阶段都要能独立部署、独立验证；重构不改变任何对外行为，除非本文件
-> 明确写出。业务规则见附录 A（重构期间这些规则一个字都不动）。
+> 状态：**Phase 0 + Phase 1 已完成（2026-11-11）**。下一步 Phase 2（Drizzle）。
+> 本文是重构的需求文档；Phase 0 结论见 §2.2 末尾。执行时每个阶段都要能独立部署、
+> 独立验证；重构不改变任何对外行为，除非本文件明确写出。业务规则见附录 A
+> （重构期间这些规则一个字都不动）。
+>
+> Phase 1.5 注：计划写的 `@cloudflare/vitest-pool-workers` 已弃用并更名为
+> `@cloudflare/vitest-plugin`；实现改用后者，验收目标不变（本地 Vitest + 真 D1）。
 
 ## 0. 背景与目标
 
@@ -111,7 +114,7 @@ v1.0–v1.7.0 是在一天之内按需求叠出来的 demo：Hono Worker + D1，
 | 服务端渲染       | **HonoX SSR + Islands**                                    | 首屏服务端渲染，后台列表/详情先出 HTML；只有交互岛（筛选、详情操作、行内编辑、文件选择、倒计时）才水合                                                                                       | 整页 SPA 水合：首屏慢、JS 量大，两个页面用不上                                                                              |
 | 校验             | **Zod v4（保留并推广）**                                   | 已在用；所有边界（MCP 入参、HTTP body/query、D1 行）都用同一套 schema                                                                                                                        | 不引入新校验库                                                                                                              |
 | 数据库           | **Drizzle ORM（drizzle-orm/d1）+ drizzle-kit**             | Hono + D1 的标准组合；schema 即类型，单点事实；migration 由工具生成和管理                                                                                                                    | 继续手写 SQL：类型要手写两份，迟早漂移；Prisma：Workers 上重，且与 D1 的结合不如 Drizzle                                    |
-| 测试             | **Vitest + @cloudflare/vitest-pool-workers**               | 在 miniflare 里跑真 D1，单元 + 集成测试本地就能跑；cron 逻辑可本地触发验证                                                                                                                   | 继续 Python + curl：只保留为上线后的冒烟检查，不再是主测试                                                                  |
+| 测试             | **Vitest + @cloudflare/vitest-plugin**（原 vitest-pool-workers） | 在 miniflare/workerd 里跑真 D1，单元 + 集成测试本地就能跑；cron 逻辑可本地触发验证                                                                                                         | 继续 Python + curl：只保留为上线后的冒烟检查，不再是主测试                                                                  |
 | Lint/Format      | **Biome**                                                  | 一个工具管 lint + format，零配置倾向，速度快                                                                                                                                                 | ESLint + Prettier：两个工具两份配置，收益相同                                                                               |
 | 构建/部署        | **Vite（HonoX 插件）+ wrangler（目标），cf.py 保留为兜底** | HonoX 是 Vite-centric：构建分两遍（`vite build --mode client && vite build`），Workers 产物走 `@hono/vite-build/cloudflare-workers`；`wrangler deploy` 一次做完部署 + 触发器                 | 见 §2.2：先做 Phase 0 验证，通不过就保留 cf.py                                                                              |
 | 脚本             | **Node + TS（tsx）**                                       | 仓库一种语言；seed / 改事实 / 生成 import map 全部改写为 TS                                                                                                                                  | 继续 Python：双语言是本次要消除的债                                                                                         |
