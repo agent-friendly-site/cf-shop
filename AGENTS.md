@@ -113,8 +113,9 @@ wrangler.toml      绑定（D1、R2）和触发器
 
 - v1.7.0 已上线：15 分钟未付款自动取消、上传链接交截图、卖家核验、
   跟踪 + 后台管理。全部功能见 `README.md` 的版本记录。
-- 进行中：`docs/refactor-plan.md` 的 v2.0 重构。**Phase 0 已通过**
-  （wrangler deploy + HonoX React spike，见 `spike-honox/`），下一步 Phase 1 地基。
-  前端已定 HonoX 0.1.62（pin 死）+ React 渲染器 + Tailwind v4 + shadcn/ui；
-  只接后台和上传页，API/MCP 不迁文件路由。接手时先读计划，按阶段做，不要跳阶段。
+- 进行中：`docs/refactor-plan.md` 的 v2.0 重构。**Phase 0 已通过**；
+  **Phase 1.1 已完成**（`src/` 全仓 TypeScript `strict`，`npm run typecheck`）。
+  下一步 Phase 1.2 Biome → 1.5 Vitest。前端已定 HonoX 0.1.62（pin 死）+ React
+  渲染器 + Tailwind v4 + shadcn/ui；只接后台和上传页，API/MCP 不迁文件路由。
+  接手时先读计划，按阶段做，不要跳阶段。
 - 待 Hall 手动做的事：关 GitHub Pages；在真机上点一遍后台和上传页（Phase 5 检查点）。

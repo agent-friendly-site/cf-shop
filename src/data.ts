@@ -112,4 +112,9 @@ export const DATA_FILES = {
   "well-known-agent.json": well_known_agent_json,
 };
 
-export function dataFile(rel) { return DATA_FILES[rel]; }
+type DataFileValue = string | Record<string, unknown>;
+type DataFileKey = keyof typeof DATA_FILES;
+
+export function dataFile(rel: string): DataFileValue | undefined {
+  return DATA_FILES[rel as DataFileKey];
+}

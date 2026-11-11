@@ -8,7 +8,7 @@ import { mkdirSync } from "node:fs";
 mkdirSync(new URL("../dist", import.meta.url), { recursive: true });
 
 await build({
-  entryPoints: ["src/index.js"],
+  entryPoints: ["src/index.ts"],
   bundle: true,
   format: "esm",
   outfile: "dist/worker.mjs",
