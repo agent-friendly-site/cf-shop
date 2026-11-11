@@ -239,6 +239,16 @@ export async function orderCounts(db, shop) {
 }
 
 export async function createOrder(db, { shop, items, total, idempotencyKey, buyerNote, buyerName, buyerContact, shippingAddress }) {
+  // The shipping address is required at the tool level (v1.5.0): the
+  // seller cannot ship without one, so an order without an address
+  // cannot be created at all. The MCP schema enforces this first;
+  // this check is the second gate for any direct caller.
+  if (typeof shippingAddress !== "string" || !shippingAddress.trim()) {
+    const e = new Error("shipping_address is required: the seller cannot ship without an address");
+    e.code = -32602;
+    throw e;
+  }
+  shippingAddress = shippingAddress.trim();
   const existing = await db
     .prepare("SELECT id FROM orders WHERE idempotency_key = ?")
     .bind(idempotencyKey)

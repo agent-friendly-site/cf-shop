@@ -253,6 +253,16 @@ info is given; creating first and asking afterwards is no longer
 allowed (only exception: the buyer explicitly insists after being
 warned the seller cannot ship without an address).
 
+v1.5.0 (same day, Hall's decision — tool-level requirement):
+`shipping_address` is now REQUIRED in `create_order`, enforced twice:
+the MCP schema rejects calls without it, and `db.createOrder`
+rejects an empty address. A blind test showed instruction-level
+wording alone did not hold — a fresh agent told "just order it"
+created an order with no buyer info. Now no agent can create an
+order without an address at all; `buyer_name` / `buyer_contact`
+stay optional, and a wrong address can still be fixed later with
+`update_buyer_info` before shipping.
+
 ## Migration notes (from GitHub Pages + agent-friendly-mcp)
 
 - The old deployment was split: static JSON on GitHub Pages

@@ -1,4 +1,4 @@
-# Test prompts — order tracking + seller admin (v1.4.1)
+# Test prompts — order tracking + seller admin (v1.5.0)
 
 Consumer-voice prompts for the new order lifecycle. Each prompt is
 self-contained: paste it to a fresh agent with only the shop URL.
@@ -91,11 +91,12 @@ buyer info could not be patched afterwards.)
 
 Expected: even when the buyer says "just order it", the agent MUST ask
 for name / contact / shipping address BEFORE calling create_order — it
-must not create the order first and ask afterwards. Only if the buyer
-explicitly refuses to give an address (after being told the seller
-cannot ship without one) may the agent create the order without it,
-and then it must fill the info in later with update_buyer_info when
-the buyer provides it. (v1.4.1 hard rule.)
+must not create the order first and ask afterwards. shipping_address
+is REQUIRED: create_order rejects the call without it, so the agent
+cannot create the order at all until the buyer gives an address. If
+the buyer refuses to give an address, the agent explains the order
+cannot be created without one and does not place the order.
+(v1.5.0 tool-level requirement.)
 
 ## Seller admin checklist (manual — the admin is a web UI, not an agent flow)
 
