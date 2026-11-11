@@ -54,8 +54,11 @@ wrangler.toml      绑定（D1、R2）和触发器
 4. **不要把密钥、token、后台 key 明文写进仓库、记忆或代码**。
    后台 key 只给过 Hall 一次，丢了就重新生成，不要为了测试去轮换他的 key。
 5. **D1 里的订单全是测试单**，交易单号全是测试号；不要当成真实订单。
-6. **前端页面改动必须真机验证**：抽 served 页面的 `<script>` 跑 `node --check`，
-   再用浏览器实际点一遍（登录、主流程、一个失败分支）。只测 API 不算验证通过。
+6. **前端页面改动必须真机验证**：`npx tsc --noEmit` 通过后，再用浏览器
+   实际点一遍（登录、主流程、一个失败分支）。只测 API 不算验证通过。
+   前端走 HonoX（React 岛 + Tailwind + shadcn/ui），见 `docs/refactor-plan.md`
+   §2.1–§2.2、§5.4：岛之间不许互相 import，`honox-island { display: contents; }`
+   不许删，React 岛与 hono/jsx 岛不混写。
 7. **声称完成前先线上验证**：部署后读线上实际返回（/health、工具列表、
    店铺文件），不要只凭本地构建成功就汇报。Pages/部署有同步延迟，
    没刷出来就明说，不要硬说成功了。
@@ -88,7 +91,8 @@ wrangler.toml      绑定（D1、R2）和触发器
 
 - **HTML 别放进 JS 模板字符串**：`ADMIN_HTML` 里的 `\'` / `\"` 转义会被剥掉，
   导致整个页面脚本解析失败（`doLogin is not defined`，2026-11-11）。
-  前端重构（`docs/refactor-plan.md` §5）就是为了根除它。
+  前端重构（`docs/refactor-plan.md` §5）就是为了根除它：页面改走 HonoX，
+  不再有模板字符串里的 HTML。
 - **D1 `/batch` 在这个账号上 404**：写 D1 一次只调一条语句。
 - **cron 触发器**：账号免费版上限 5 个/账号，已满；本 Worker 只有 1 个触发器
   （每分钟 `* * * * *`）。新建/修改触发器后要等约 15 分钟才会第一次触发，
@@ -110,5 +114,8 @@ wrangler.toml      绑定（D1、R2）和触发器
 - v1.7.0 已上线：15 分钟未付款自动取消、上传链接交截图、卖家核验、
   跟踪 + 后台管理。全部功能见 `README.md` 的版本记录。
 - 进行中：`docs/refactor-plan.md` 的 v2.0 重构（Hono + TypeScript，
-  Phase 1–6）。接手时先读那份计划，按阶段做，不要跳阶段。
+  Phase 1–6）。前端已定 HonoX（Hall 2026-11-11 选定）：HonoX 0.1.x alpha，
+  React 渲染器（BYOR）+ Tailwind v4 + shadcn/ui + TanStack Query，
+  只接后台和上传页两个页面，API/MCP 不迁文件路由；Phase 0 先跑 spike 验证，
+  不通过不进 Phase 5。接手时先读那份计划，按阶段做，不要跳阶段。
 - 待 Hall 手动做的事：关 GitHub Pages；在真机上点一遍后台和上传页（Phase 5 检查点）。

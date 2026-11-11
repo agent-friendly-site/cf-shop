@@ -29,7 +29,9 @@ v1.0–v1.7.0 是在一天之内按需求叠出来的 demo：Hono Worker + D1，
 2. **代码按最佳实践分层**：路由 → 服务 → 数据，MCP 工具是服务的薄适配层，
    前端页面是真正的源文件，不再有模板字符串里的 HTML。
 3. **前端按最佳体验重写**：后台管理页和上传页状态清晰（加载/空/错/成功）、
-   手机上能用、操作有反馈，但代码保持最简——不用 SPA 框架。
+   手机上能用、操作有反馈。卖家后台是复杂交互页，用 HonoX（Hono 官方
+   meta-framework）+ React Islands + Tailwind + shadcn/ui 做，不再手写
+   裸 HTML + 原生 TS 去重造组件库。
 4. **可验证**：每个阶段结束都有自动化测试 + 线上验证，任何时候都能回滚。
 
 ### 0.3 非目标（这次不做）
@@ -37,6 +39,10 @@ v1.0–v1.7.0 是在一天之内按需求叠出来的 demo：Hono Worker + D1，
 - 不加新功能：不做退款、商品上下架、多员工权限、自定义域名、
   confirm_payment / mark_shipped 的 MCP 鉴权（仍是后台 UI 为唯一鉴权路径）。
 - 不换框架：继续 Hono，继续 Cloudflare Workers + D1 + R2，继续单 Worker。
+  前端改走 HonoX（仍是 Hono 生态），但 **API / MCP / 店铺静态文件路由
+  不迁到 HonoX 文件路由**：它们继续留在 `src/routes/` + `src/mcp/` 里
+  用代码挂载，HonoX 只接两个页面（后台 + 上传页）。这是本次重构
+  范围的硬边界，见 §2.1。
 - 不动对外契约：所有 HTTP 路由、MCP 工具名/参数、店铺文件路径、订单状态机、
   价格/政策/时限（15 分钟、7 天）全部不变。
 - 不动线上数据：D1 里的订单、凭据、后台 key 全部保留；不重建数据库。
@@ -92,29 +98,66 @@ v1.0–v1.7.0 是在一天之内按需求叠出来的 demo：Hono Worker + D1，
 ## 2. 目标技术栈（定稿）
 
 原则：**选 Hono 生态里最标准、最少胶水的组合；一个 coding agent
-不用学新框架就能改；不为两个页面引入 SPA 工具链。**
+不用学新框架就能改；后台的复杂交互交给成熟的 React 组件生态，
+而不是手写组件。**
 
 | 层 | 选择 | 为什么是它 | 替代方案（为什么不选） |
 | --- | --- | --- | --- |
 | 语言 | **TypeScript（strict）** | 对 coding agent 收益最大：类型即文档，改字段、改接口时编译器先报错；Hono + MCP SDK 都是 TS 优先 | 继续 JS：省事但 agent 每次都要靠 grep 猜形状 |
 | 框架 | **Hono（保留）** | 已在用；Workers 原生、体积小、类型完备 | 不换框架是本次非目标 |
-| 服务端渲染 | **hono/jsx** | Hono 自带，无新依赖；页面写成真正的 `.tsx` 源文件，类型检查覆盖模板 | React/Preact + Vite：两个页面用不上，构建链翻倍 |
+| 全栈框架（前端） | **HonoX 0.1.x（alpha，见 §2.1 风险）** | Hono 官方 meta-framework：文件路由 + SSR + Islands 水合，只给交互组件发 JS；`createApp()` 返回的就是 Hono 实例，可挂载现有 API | 纯 Vite + React SPA：脱离 Hono，又要多维护一套路由/渲染；hono/jsx + 手写 CSS：已证明撑不起后台体验（§0.1、2026-11-11 讨论） |
+| 渲染器 | **React（BYOR，`@hono/react-renderer`）** | HonoX 默认是 hono/jsx；要上 shadcn/ui 必须走 BYOR 换 React 渲染器。React 岛用 `/** @jsxImportSource react */`，写 `className`、从 `react` 引 hooks，与 hono/jsx（`class`、`hono/jsx`）不混用 | 默认 hono/jsx：组件生态小，shadcn 要用非官方的 shadcn-hono-jsx 移植版；见 §2.1 兜底 |
+| 服务端渲染 | **HonoX SSR + Islands** | 首屏服务端渲染，后台列表/详情先出 HTML；只有交互岛（筛选、详情操作、行内编辑、文件选择、倒计时）才水合 | 整页 SPA 水合：首屏慢、JS 量大，两个页面用不上 |
 | 校验 | **Zod v4（保留并推广）** | 已在用；所有边界（MCP 入参、HTTP body/query、D1 行）都用同一套 schema | 不引入新校验库 |
 | 数据库 | **Drizzle ORM（drizzle-orm/d1）+ drizzle-kit** | Hono + D1 的标准组合；schema 即类型，单点事实；migration 由工具生成和管理 | 继续手写 SQL：类型要手写两份，迟早漂移；Prisma：Workers 上重，且与 D1 的结合不如 Drizzle |
 | 测试 | **Vitest + @cloudflare/vitest-pool-workers** | 在 miniflare 里跑真 D1，单元 + 集成测试本地就能跑；cron 逻辑可本地触发验证 | 继续 Python + curl：只保留为上线后的冒烟检查，不再是主测试 |
 | Lint/Format | **Biome** | 一个工具管 lint + format，零配置倾向，速度快 | ESLint + Prettier：两个工具两份配置，收益相同 |
-| 构建/部署 | **wrangler（目标），cf.py 保留为兜底** | 标准路径；`wrangler.toml` 已有绑定和触发器；`wrangler deploy` 一次做完部署 + 触发器 | 见 §2.1：先做 Phase 0 验证，通不过就保留 cf.py |
+| 构建/部署 | **Vite（HonoX 插件）+ wrangler（目标），cf.py 保留为兜底** | HonoX 是 Vite-centric：构建分两遍（`vite build --mode client && vite build`），Workers 产物走 `@hono/vite-build/cloudflare-workers`；`wrangler deploy` 一次做完部署 + 触发器 | 见 §2.2：先做 Phase 0 验证，通不过就保留 cf.py |
 | 脚本 | **Node + TS（tsx）** | 仓库一种语言；seed / 改事实 / 生成 import map 全部改写为 TS | 继续 Python：双语言是本次要消除的债 |
-| 前端 JS | **原生 TS，无框架** | 两个页面，交互就是表单 + 列表；data-attribute + 事件委托（已验证过的模式） | htmx / Alpine：多一个心智模型，收益抵不过 |
-| CSS | **手写单文件 `style.css`，无框架** | 两个页面，约 200 行足够；不引入 Tailwind 的构建链 | Tailwind：为两个页面配构建不值 |
+| 前端样式 | **Tailwind CSS v4（`@tailwindcss/vite`）** | HonoX 官方指引的样式方案；`app/style.css` 里 `@import "tailwindcss" source("../app")`，在 `_renderer.tsx` 里用 `Link` 引入；设计 token（颜色、状态徽标、按钮）两页共用 | 手写单文件 CSS：两个页面约 200 行够用，但后台组件一多就失控，且与 shadcn 不搭 |
+| 前端组件 | **shadcn/ui（React / Radix）** | 后台要的 Table、Dialog、Toast、Form、Badge、Skeleton 都是现成可复制的组件；无障碍（键盘、焦点）由 Radix 兜底；coding agent 训练语料最多 | 手写组件：重造轮子，且容易丢无障碍；Mantine/Ant Design：重、与 Tailwind v4 搭配的胶水多，不如 shadcn 轻 |
+| 前端数据 | **TanStack Query + React Hook Form + Zod** | 后台是服务端状态密集页：列表加载/错误重试/操作后自动刷新由 Query 管；确认收款、发货、改价/改政策的表单由 Hook Form + Zod 管，校验与后端共用 schema | 手写 fetch + 手动刷 DOM：正是现在 `admin.js` 的写法，状态一多就乱 |
 
-**明确不引入**：React/Vue/Svelte、Vite、tRPC、Prisma、Tailwind、
-任何状态管理库、任何组件库。
+**明确不引入**：Vue/Svelte、tRPC、Prisma、任何状态管理库（Zustand/Redux 等）、
+任何 SPA 路由库（HonoX 文件路由已覆盖）。React 只出现在 HonoX 岛里，
+不做整页 SPA；MCP/API 层不引 React。
 
-### 2.1 Phase 0 决策点：部署走 wrangler 还是保留 cf.py
+### 2.1 HonoX 采用方式与风险（必读）
+
+Hall 2026-11-11 定：前端走 HonoX。以下四条是写进计划的约束，
+执行时不许绕过：
+
+1. **HonoX 只接两个页面，不接 API**。后台 `/shops/:shop/admin/` 和
+   上传页 `/shops/:shop/orders/:id/upload-proof` 走 HonoX 文件路由
+   （`app/routes/`）；`/shops/:shop/mcp`、订单/商品/政策等 API、店铺静态
+   文件路由继续留在 `src/` 里用代码挂载。`createApp()` 返回 Hono 实例，
+   API 子应用用 `.route()` 挂上去——这条混合挂载能不能走通，是 Phase 0
+   spike 必须验证的第一项（见 §2.2），验证不通过就停下来，不要硬迁 API。
+2. **HonoX 还是 alpha（0.1.x，2026-11-11 查到最新 0.1.62）**：按 0ver
+   语义，小版本内也可能有 breaking change。`package.json` 里 pin 死确切
+   版本，升级只在单独 commit 里做并重跑 Phase 5 验收。不要用 `^0.1.x`。
+3. **React 是 BYOR，不是官方默认支持**。HonoX 默认渲染器是 hono/jsx；
+   官方文档明说自带渲染器“可能不提供支持”（We may not provide support
+   for the renderer you bring）。所以 React 渲染器 + Tailwind + shadcn 这
+   条链路必须在 Phase 0 spike 里先在 Workers 上跑通（登录→列表→确认收款
+   一条线），跑不通就走兜底：**hono/jsx 岛 + shadcn-hono-jsx 移植版**，
+   不要在 Phase 5 才发现 React 岛水合不了。
+4. **Islands 铁律**（HonoX 已知坑，写进 AGENTS.md）：
+   - 岛只能放在 `app/islands/` 或以 `$` 前缀命名；岛拿不到请求上下文，
+     数据必须由路由文件以 props 传进去。
+   - **绝不从一个岛里 import 另一个岛**（HonoX Issue #154：子岛会重复求值、
+     状态重置）；共用逻辑抽到 `app/lib/`。
+   - `<honox-island>` 默认是 `display: inline`，`style.css` 里必须有
+     `honox-island { display: contents; }`，不要删。
+   - React 岛与 hono/jsx 岛不混写：React 岛用 `className` + `react` 的 hooks；
+     hono/jsx 岛用 `class` + `hono/jsx` 的 hooks。
+
+### 2.2 Phase 0 决策点：部署走 wrangler 还是保留 cf.py + HonoX spike
 
 现状：部署用 `cf.py worker-put`，因为 wrangler 用不了 vault 里的 token。
-重构第一步先验证，不假设：
+重构第一步先验证，不假设。Phase 0 包含两个验证，做完才进 Phase 1：
+
+**（a）部署验证**
 
 - 尝试 `CLOUDFLARE_API_TOKEN=<vault 换出的 token> npx wrangler deploy`
   （token 只进环境变量，不进文件、不进仓库）。
@@ -123,6 +166,26 @@ v1.0–v1.7.0 是在一天之内按需求叠出来的 demo：Hono Worker + D1，
   deploy 不会超）；cf.py 退为 D1/R2 管理工具。
 - **如果不通**：保留 `cf.py worker-put` + API 设触发器，在 AGENTS.md
   里写明原因；不要为了换工具而换工具，更不要把 token 写进仓库或脚本。
+
+**（b）HonoX spike（新增，2026-11-11 Hall 定 HonoX 后补）**
+
+在独立分支上搭一个最小 HonoX 应用（`npm create hono@latest` 选 `x-basic`
+为起点，再换 React 渲染器），必须逐项跑通才算通过：
+
+1. `createApp()` 返回的 Hono 实例能 `.route()` 挂载现有 API 子应用
+   （至少挂一个 `/shops/:shop/mcp` 级别的路由），且 HonoX 文件路由
+   （`app/routes/shops/[shop]/admin.tsx`）与 API 路由不冲突。
+2. React 渲染器（`@hono/react-renderer`）+ 一个 React 岛在 Workers 上
+   正常 SSR + 水合；Tailwind v4（`@tailwindcss/vite`）样式正常出；
+   一个 shadcn/ui 组件（Dialog 或 Toast）能正常交互。
+3. 两遍构建（`vite build --mode client && vite build`）+ Workers 产物
+   （`@hono/vite-build/cloudflare-workers`）能部署到线上并跑通
+   “登录 → 订单列表 → 点开详情 → 确认收款”一条线（可用测试订单）。
+4. 产物大小与冷启动可接受：HonoX + React 会比现在 1.0 MB 的单文件 bundle
+   大，记下实际大小；如果 Workers 免费版跑起来明显变慢，停下来找 Hall 定。
+
+任一项不通过：先按 §2.1 第 3 条走兜底（hono/jsx 岛 + shadcn-hono-jsx），
+兜底也不通则回 Phase 0 重新定前端方案，**不要带着未验证的选型进 Phase 5**。
 
 两种结果都要在 README 里写清最终采用的部署命令。
 
@@ -178,8 +241,8 @@ src/
     shop.ts                 # 店铺静态文件 + 商品/政策等读接口
     orders.ts               # 订单事件公开接口
     mcp.ts                  # POST /shops/:shop/mcp（转调 mcp/）
-    admin.ts                # 后台页面 + 后台 API
-    upload.ts               # 上传页 + 上传接口
+    admin.ts                # 后台 API（页面移到 app/routes/shops/[shop]/admin.tsx）
+    upload.ts               # 上传接口（页面移到 app/routes/shops/[shop]/orders/[id]/upload-proof.tsx）
     health.ts               # /health
   mcp/
     server.ts               # createMcpServer（注册表）
@@ -188,19 +251,35 @@ src/
       orders.ts             # create_order / get_order / update_buyer_info / cancel_order
       payments.ts           # submit_payment_proof / get_payment_proof_upload_link / confirm_payment
       shipping.ts           # mark_shipped / confirm_receipt
-  ui/
-    layout.tsx              # 页面骨架（head、style 引用）
-    admin.tsx               # 后台管理页（JSX）
-    upload.tsx              # 上传页（JSX）
-    components.tsx          # 共用小组件（状态徽标、空态、错误条）
-  client/
-    admin.ts                # 后台页浏览器脚本（表单、列表、事件委托）
-    upload.ts               # 上传页浏览器脚本（文件选择、预览、提交）
-    http.ts                 # fetch 封装（鉴权头、错误映射）
   static/
-    style.css               # 全部页面共用样式（手写，约 200 行）
     data.ts                 # 生成的静态文件 import map（生成器改写为 TS，见 §4.6）
   data/                     # 店铺事实（不动，仍是 JSON/Markdown）
+app/                         # HonoX 前端（只含两个页面，见 §2.1；API 不进这里）
+  server.ts                 # createApp() 入口：挂 app/routes + .route() 挂 src/ 的 API
+  client.ts                 # 客户端入口（水合 islands）
+  routes/
+    _renderer.tsx           # reactRenderer：html 骨架 + Tailwind <Link>
+    shops/
+      [shop]/
+        admin.tsx           # GET /shops/:shop/admin/（SSR 壳 + 岛）
+        orders/
+          [id]/
+            upload-proof.tsx  # GET /shops/:shop/orders/:id/upload-proof（SSR 壳 + 岛）
+  islands/
+    admin/
+      order-list.tsx        # 订单列表岛：筛选、分页、点开详情
+      order-detail.tsx      # 订单详情岛：时间线、凭据放大、确认收款/发货/取消
+      product-editor.tsx    # 商品改价/库存岛（行内编辑）
+      policy-editor.tsx     # 政策/收款方式岛（行内编辑）
+    upload/
+      proof-form.tsx        # 上传表单岛：倒计时、文件预览、提交
+      # 注意：岛之间不许互相 import（HonoX Issue #154），共用逻辑放 app/lib/
+  components/
+    ui/                     # shadcn/ui 组件（Button/Dialog/Toast/Table/Form/Badge/Skeleton）
+  lib/
+    api.ts                  # 前端 fetch 封装（鉴权头、超时、错误映射）
+    format.ts               # 金额/时间格式化（纯函数）
+  style.css                 # Tailwind v4 入口：@import "tailwindcss" source("../app") + honox-island { display: contents; }
 drizzle/                    # drizzle-kit 生成的 migrations（接管 migrations/）
 tests/
   unit/                     # Vitest：money、状态机、校验
@@ -233,8 +312,9 @@ scripts/
 | --- | --- | --- |
 | 1.1 | TypeScript：全仓改 `.ts`，`strict: true`；esbuild 已支持 TS，构建脚本基本不动；修掉所有类型错误 | `npx tsc --noEmit` 通过；`npm run build` 产物与之前等价（/health、关键路由冒烟通过） |
 | 1.2 | Biome 接入：`biome.json`，`npm run lint` / `npm run format`；全仓格式化一次（单独 commit，不混业务改动） | lint 零错误；格式化 commit 里只有空白/风格变化 |
-| 1.3 | Phase 0 部署验证（§2.1）：wrangler deploy 是否走通；定稿部署命令，写进 README 和 AGENTS.md | 明确结论 + 命令；线上版本不变 |
-| 1.4 | Vitest + workers-pool 搭架子：能跑一个最小集成测试（建 D1、seed、调一次服务） | `npm test` 本地通过，不依赖线上 |
+| 1.3 | Phase 0 部署验证（§2.2（a））：wrangler deploy 是否走通；定稿部署命令，写进 README 和 AGENTS.md | 明确结论 + 命令；线上版本不变 |
+| 1.4 | HonoX spike（§2.2（b））：最小 HonoX + React 渲染器 + Tailwind + shadcn 应用，验证混合挂载、岛水合、两遍构建、线上登录→列表→确认收款一条线；产物大小记入 README | spike 验收 4 项全过，或按 §2.1 走兜底并记录决策；**不通过不进 Phase 5** |
+| 1.5 | Vitest + workers-pool 搭架子：能跑一个最小集成测试（建 D1、seed、调一次服务） | `npm test` 本地通过，不依赖线上 |
 
 ### 4.2 Phase 2 — 数据层（Drizzle）
 
@@ -264,14 +344,15 @@ scripts/
 | 4.3 | 统一鉴权中间件：后台 API 的 `requireAdmin`、上传 token 校验收进 `routes/middleware.ts`（或 Hono 中间件），消除两处各自实现 | 未授权访问测试：无 key 401、无 token 拒绝、过期 token 拒绝 |
 | 4.4 | 静态文件：`src/static/data.ts` 生成器改写为 TS；店铺文件内容不动 | 全部店铺路由与重构前逐字节比对（compare_routes.py 全过） |
 
-### 4.5 Phase 5 — 前端重写（两个页面，见 §5）
+### 4.5 Phase 5 — 前端重写（HonoX，两个页面，见 §5）
 
 | # | 任务 | 验收 |
 | --- | --- | --- |
-| 5.1 | 上传页：`ui/upload.tsx` + `client/upload.ts` + 共用 `ui/layout.tsx` / `static/style.css` | §5 的验收清单全过；真机浏览器测试通过 |
-| 5.2 | 后台页：`ui/admin.tsx` + `client/admin.ts` | §5 的验收清单全过；真机浏览器测试通过（含登录失败、确认收款金额不符、发货、取消） |
-| 5.3 | 删掉 `ADMIN_HTML` 模板字符串和 `page()` HTML 拼接；全仓 grep 确认没有残留的 HTML 模板字符串 | `grep -r "ADMIN_HTML\|<!doctype" src/` 零命中（测试除外） |
+| 5.1 | 上传页：`app/routes/shops/[shop]/orders/[id]/upload-proof.tsx`（SSR 壳）+ `app/islands/upload/proof-form.tsx`（倒计时、文件预览、提交）+ 共用 `_renderer.tsx` / `app/style.css` | §5 的验收清单全过；真机浏览器测试通过 |
+| 5.2 | 后台页：`app/routes/shops/[shop]/admin.tsx`（SSR 壳）+ `app/islands/admin/` 四个岛（列表、详情、商品编辑、政策编辑）+ shadcn/ui 组件 | §5 的验收清单全过；真机浏览器测试通过（含登录失败、确认收款金额不符、发货、取消） |
+| 5.3 | 删掉 `ADMIN_HTML` 模板字符串和 `page()` HTML 拼接；全仓 grep 确认没有残留的 HTML 模板字符串；同时删掉 `src/ui/`、`src/client/` 占位（如果 Phase 1–4 建过的话，以 `app/` 为准） | `grep -r "ADMIN_HTML\|<!doctype" src/ app/` 零命中（测试除外） |
 | 5.4 | 旧 Python 测试退役：`tests/test_client.py` / `test_admin.py` 改为仅上线后冒烟（或由 `tests/smoke.ts` 替代）；`compare_routes.py` 保留为比对工具直到 4.4 完成，之后可删 | `npm test` 不再依赖线上；冒烟脚本单独命令 |
+| 5.5 | HonoX 回归：岛之间无互相 import（grep 检查）、`honox-island { display: contents; }` 在样式里、React 岛与 hono/jsx 岛不混写 | 静态检查全过；Phase 0 spike 的验收项在完整版上重跑一遍 |
 
 ### 4.6 Phase 6 — 收尾
 
@@ -284,8 +365,11 @@ scripts/
 ## 5. 前端重写需求
 
 两个页面：卖家后台（`/shops/:shop/admin/`）和付款截图上传页
-（`/shops/:shop/orders/:id/upload-proof`）。要求分两层：**体验要求**
-（用户感知）和**实现要求**（代码约束）。
+（`/shops/:shop/orders/:id/upload-proof`），都走 HonoX：SSR 出首屏，
+交互只在岛里水合。要求分两层：**体验要求**（用户感知）和
+**实现要求**（代码约束）。后台体验不达标是这次改前端的直接原因
+（2026-11-11 Hall：现在后台的裸表格 + `alert`/`confirm` 完全不合格，
+好体验离不开 UI 框架）——§5.3 的验收按“能用的后台”写，不按“能跑的页面”写。
 
 ### 5.1 体验要求（两个页面通用）
 
@@ -326,19 +410,28 @@ scripts/
 - 发货：快递公司 + 单号；取消：填原因并确认；改商品价格/库存、改政策、
   改收款方式：行内编辑，保存/取消，保存失败显示原因、成功显示已保存。
 - 列表刷新不丢筛选条件；操作失败不丢已填内容。
+- 反馈用组件，不用浏览器原生弹窗：成功用 Toast、取消/ destructive 操作
+  用 Dialog 确认、保存中按钮带加载态、列表加载用 Skeleton——
+  `alert()` / `confirm()` 在新后台里不许出现。
 
 ### 5.4 实现要求（硬约束）
 
-- 页面用 **hono/jsx** 写成 `.tsx` 源文件；样式用 `static/style.css`；
-  浏览器脚本用 **TS 源文件**（`client/*.ts`），由 esbuild 打包进 Worker
-  或作为静态资源由 Worker 提供——**禁止把 HTML/CSS/JS 拼进模板字符串**。
-- 不用内联 `onclick` / `onchange`；事件一律 data-attribute + 事件委托
-  （v1.2.0 修复验证过的模式）。
-- 浏览器脚本只做：读 DOM、调 API、渲染结果；不拼业务规则
+- 页面走 **HonoX 文件路由**（`app/routes/`），渲染器是 **React**
+  （`@hono/react-renderer`，`app/routes/_renderer.tsx`）；交互组件是
+  **React 岛**（`app/islands/`），样式是 **Tailwind v4 + shadcn/ui**——
+  **禁止把 HTML/CSS/JS 拼进模板字符串**。
+- 不用内联 `onclick` / `onchange`；交互一律用 React 组件 + TanStack Query
+  （服务端状态）+ React Hook Form + Zod（表单校验）。
+  v1.2.0 的 data-attribute + 事件委托模式随 `admin.js` 一起退役，
+  不再作为新前端的模式。
+- 岛只做：读 props、调 API（`app/lib/api.ts` 统一封装：鉴权头、超时、
+  错误映射、JSON 解析失败处理）、渲染结果；不拼业务规则
   （金额、时限、状态机的判断在服务端）。
-- fetch 封装统一（`client/http.ts`）：鉴权头、超时、错误映射、JSON 解析失败处理。
-- 每个页面改动后必须：抽 served 页面跑类型检查（TS 覆盖模板）+
-  真机浏览器点一遍（登录、主流程、一个失败分支）。
+- 岛之间**不许互相 import**（HonoX Issue #154）；共用逻辑放 `app/lib/`；
+  React 岛与 hono/jsx 岛不混写；`honox-island { display: contents; }`
+  必须保留在样式里。
+- 每个页面改动后必须：`npx tsc --noEmit` 通过 + 真机浏览器点一遍
+  （登录、主流程、一个失败分支）。只测 API 不算验证通过。
 
 ## 6. 横切关注点
 
@@ -378,6 +471,10 @@ scripts/
   （cf.py 已处理；走 wrangler 时由 wrangler 处理）。
 - workers.dev 有 Browser Integrity Check：自动化客户端要带浏览器 UA。
 - MCP 里没有图片上传（v1.6.0 已用链接方案解决，重构不许改回读图方案）。
+- **HonoX（alpha 0.1.x，pin 死版本）**：React 是 BYOR，官方不保证支持——
+  React 渲染器链路必须先在 Phase 0 spike 跑通；岛之间不许互相 import
+  （Issue #154）；`honox-island { display: contents; }` 不许删；
+  API/MCP 不迁文件路由（§2.1）。
 
 ## 7. 数据与迁移
 
@@ -438,7 +535,8 @@ Phase 5 前端 → Phase 6 收尾。每个 Phase 是一个或多个小 commit，
 
 ### 9.3 检查点
 
-- Phase 1 结束：Hall 确认部署命令定稿（wrangler 还是 cf.py）。
+- Phase 1 结束：Hall 确认部署命令定稿（wrangler 还是 cf.py）+ HonoX spike
+  结论（React 渲染器走通，或走 §2.1 兜底）。
 - Phase 4 结束：Hall 确认对外契约无变化（工具列表 + 路由表比对报告）。
 - Phase 5 结束：Hall 在真机上点一遍后台和上传页，确认体验。
 - Phase 6 结束：v2.0 发版。
