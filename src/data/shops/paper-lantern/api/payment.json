@@ -3,28 +3,28 @@
  "payment": {
   "online": false,
   "method": "offline",
-  "summary": "线下支付：确认订单后卖家提供收款方式，买家在 Agent 外付款，付款后提交付款凭据，卖家核验到账后发货。",
+  "summary": "线下支付：下单后 Agent 会把卖家配置的收款方式（含收款账号）发给买家，买家在 Agent 外付款，付款后提交付款凭据（交易单号或付款截图），卖家核验到账后发货。凭据提交后 Agent 才开始跟踪订单。",
   "methods": [
    {
     "id": "bank_transfer",
     "label": "银行转账",
-    "instructions": "确认订单后，卖家提供收款银行、户名和账号；转账时请备注订单号。"
+    "instructions": "银行转账：工商银行，户名：纸灯文具，账号：6222 0000 0000 0002（测试账号，请勿真实转账）；转账时请备注订单号。"
    },
    {
     "id": "wechat_pay",
     "label": "微信支付",
-    "instructions": "确认订单后，卖家提供微信收款账号；付款后请保存付款截图和交易单号。"
+    "instructions": "微信支付：微信收款号 gh_paper_lantern（测试账号）；付款后请保存付款截图和交易单号。"
    },
    {
     "id": "alipay",
     "label": "支付宝",
-    "instructions": "确认订单后，卖家提供支付宝账号；付款时请备注订单号。"
+    "instructions": "支付宝：账号 test@paper-lantern.demo（测试账号）；付款时请备注订单号。"
    }
   ],
   "never_in_chat": [
-   "银行卡号",
-   "验证码",
-   "支付密码"
+   "买家的银行卡号",
+   "买家收到的验证码",
+   "买家的支付密码"
   ],
   "flow": [
    {
@@ -34,8 +34,8 @@
    },
    {
     "step": 2,
-    "title": "卖家提供收款方式",
-    "detail": "订单确认后，卖家在订单里给出线下收款方式（银行转账 / 微信支付 / 支付宝）。"
+    "title": "Agent 发收款方式",
+    "detail": "下单成功后，Agent 立即把卖家配置的收款方式发给买家：每种方式的收款账号原样列出，并让买家选一种（银行转账 / 微信支付 / 支付宝）。"
    },
    {
     "step": 3,
@@ -45,12 +45,12 @@
    {
     "step": 4,
     "title": "提交付款凭据",
-    "detail": "买家把交易单号发给 Agent（可用 submit_payment_proof 工具），也可附付款截图说明。提交后订单状态为 payment_submitted（待核验），不是已付款。"
+    "detail": "买家把交易单号发给 Agent，也可发付款截图（Agent 从截图里读出交易单号再提交）；用 submit_payment_proof 工具提交后订单状态为 payment_submitted（待核验），不是已付款。凭据提交成功后，Agent 才为这个订单建跟踪任务。"
    },
    {
     "step": 5,
     "title": "卖家核验",
-    "detail": "卖家在 24 小时内核对到账和金额（用 confirm_payment 工具，verified_amount_cny 必须等于订单总额）；金额不符或查不到时联系买家核对，订单保持待核验，不发货。"
+    "detail": "卖家在 24 小时内核对到账和金额（用 confirm_payment 工具，verified_amount_cny 必须等于订单总额）；金额不符或查不到时联系买家核对，订单保持待核验，不发货。跟踪任务随后每 6 小时查一次订单状态，卖家确认收款、发货后都会主动告诉买家。"
    },
    {
     "step": 6,
@@ -60,7 +60,7 @@
    {
     "step": 7,
     "title": "确认收货",
-    "detail": "收到货后，买家让 Agent 用 confirm_receipt 确认收货，订单变为 completed；发货满 7 天无人确认，订单自动完成。付款前买家或卖家可用 cancel_order 取消订单。"
+    "detail": "收到货后，买家让 Agent 用 confirm_receipt 确认收货，订单变为 completed；发货满 7 天无人确认，订单自动完成。付款前买家或卖家可用 cancel_order 取消订单，取消成功后立即删除跟踪任务。"
    }
   ],
   "order_statuses": [

@@ -42,7 +42,7 @@ function publicProduct(p) {
 export function createMcpServer(env, shop) {
   const server = new McpServer({
     name: "agent-friendly-platform",
-    version: "1.2.0",
+    version: "1.3.0",
   });
 
   server.registerTool(
@@ -124,7 +124,7 @@ export function createMcpServer(env, shop) {
     {
       title: "Create order",
       description:
-        "Create an order. Requires idempotency_key. Order starts as pending_payment; payment is offline, instructions are returned with the order. Ask the buyer for name, contact and shipping address at the confirmation step and pass them as buyer_name / buyer_contact / shipping_address (all optional, but the seller needs an address to ship). After a successful create_order, automatically start tracking this order: check get_order every 6 hours and tell the buyer when the status changes, until it reaches completed or cancelled.",
+        "Create an order. Requires idempotency_key. Order starts as pending_payment; payment is offline, instructions are returned with the order. Ask the buyer for name, contact and shipping address at the confirmation step and pass them as buyer_name / buyer_contact / shipping_address (all optional, but the seller needs an address to ship). After a successful create_order, send the buyer the payment instructions returned with the order (payment method + the seller's configured receiving account, verbatim) and wait for the buyer to pay offline and submit proof. Do NOT start tracking this order yet: tracking starts only after submit_payment_proof succeeds.",
       inputSchema: {
         items: z.array(ItemShape),
         idempotency_key: z.string(),
@@ -155,9 +155,9 @@ export function createMcpServer(env, shop) {
           summary: "线下支付：确认订单后卖家提供收款方式，买家在 Agent 外付款，付款后提交付款凭据，卖家核验到账后发货。",
         },
         total_verbatim: t.verbatim,
-        next_step: "买家按卖家给的线下收款方式付款，然后用 submit_payment_proof 提交交易单号。",
+        next_step: "买家按卖家给的线下收款方式付款，然后用 submit_payment_proof 提交交易单号（或付款截图，由 Agent 从截图里读出交易单号再提交）。",
         tracking:
-          "订单已创建，我会自动帮你跟进：每 6 小时查一次状态，有变化就告诉你，直到订单完成或取消。你不用记订单号，直接问我订单怎么样了就行。",
+          "先不要建跟踪任务：等买家提交付款凭据、submit_payment_proof 成功（订单变为 payment_submitted）之后，再为这个订单建跟踪任务：每 6 小时查一次 get_order，有变化就告诉买家，直到订单完成或取消；订单取消时一并删除跟踪任务。",
       });
     }
   );
@@ -167,7 +167,7 @@ export function createMcpServer(env, shop) {
     {
       title: "Submit payment proof",
       description:
-        "Submit offline payment proof (transaction id) for an order. The order becomes payment_submitted (awaiting seller verification), NOT paid. The seller must then verify the actual receipt and amount with confirm_payment; only then does the order become paid and ship. Never send card numbers or verification codes.",
+        "Submit offline payment proof (transaction id) for an order. The order becomes payment_submitted (awaiting seller verification), NOT paid. The seller must then verify the actual receipt and amount with confirm_payment; only then does the order become paid and ship. After a successful submit_payment_proof, start tracking this order: check get_order every 6 hours and tell the buyer when the status changes, until it reaches completed or cancelled; if the order is cancelled, delete the tracking task. Never send the buyer's card numbers or verification codes.",
       inputSchema: {
         order_id: z.string(),
         payment_method: z.string(),
@@ -189,6 +189,8 @@ export function createMcpServer(env, shop) {
         verification:
           "订单已标记为待核验（payment_submitted），不是已付款。卖家须核对到账和金额后用 confirm_payment 确认，确认后订单才变为已付款并发货。",
         next_step: "Seller: check the actual receipt (bank / WeChat / Alipay) and amount, then call confirm_payment with verified_amount_cny equal to the order total.",
+        tracking:
+          "凭据已提交，现在为这个订单建跟踪任务：每 6 小时查一次 get_order，状态变了就主动告诉买家新状态是什么意思、下一步是什么；到 completed 或 cancelled 发一条结尾消息并删除跟踪任务，不再继续查。买家不用记订单号，直接问订单怎么样了就行。",
       });
     }
   );
@@ -270,7 +272,7 @@ export function createMcpServer(env, shop) {
       const order = await db.confirmReceipt(env.DB, { orderId: order_id });
       return text({
         order,
-        note: `Order ${order_id} is now completed. Thank you — the tracking task for this order stops here.`,
+        note: `Order ${order_id} is now completed. Thank you — delete the tracking task for this order; it stops here.`,
       });
     }
   );
@@ -280,7 +282,7 @@ export function createMcpServer(env, shop) {
     {
       title: "Cancel order",
       description:
-        "Cancel an order before it is paid. Only pending_payment and payment_submitted orders can be cancelled; a paid order cannot be cancelled this way (refunds are not supported in v1).",
+        "Cancel an order before it is paid. Only pending_payment and payment_submitted orders can be cancelled; a paid order cannot be cancelled this way (refunds are not supported in v1). After a successful cancel, also cancel/delete the tracking task for this order if one was created, and tell the buyer tracking has stopped.",
       inputSchema: {
         order_id: z.string(),
         reason: z.string().optional(),
@@ -290,7 +292,7 @@ export function createMcpServer(env, shop) {
       const order = await db.cancelOrder(env.DB, { orderId: order_id, reason });
       return text({
         order,
-        note: `Order ${order_id} is now cancelled. The tracking task for this order stops here.`,
+        note: `Order ${order_id} is now cancelled. Also cancel/delete the tracking task for this order (if one exists) and tell the buyer tracking has stopped — do not keep polling it.`,
       });
     }
   );

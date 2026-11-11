@@ -219,6 +219,24 @@ auto-complete query selects; old paid orders have no `shipped_at` and
 are excluded. The cron trigger itself (daily 02:00 UTC) has not fired
 yet — the backdated order is expected to complete on the next run.
 
+Order flow correction (v1.3.0, 2026-11-11, after Hall's own test order
+`ord_mwbs00xustqe`): the v1.2.0 flow created the tracking task right
+after `create_order` and only said "the seller provides payment
+methods", so the buyer never received the seller's receiving account
+and was tracked before paying. Corrected order: `create_order` →
+agent sends the seller's configured payment methods with receiving
+accounts (from `api/payment.json`, editable in admin under
+policies → payment methods; demo shops carry clearly-marked test
+accounts) → buyer pays offline → buyer submits the transaction id or
+a payment screenshot (the agent reads the id from the screenshot) →
+`submit_payment_proof` → `payment_submitted`, and only then the agent
+creates the tracking task (6-hour `get_order` polls, notify on change,
+stop at `completed`/`cancelled`) → seller confirms payment in admin →
+ships → buyer confirms receipt. Cancelling an order also deletes its
+tracking task. `never_in_chat` now means the *buyer's* card number /
+verification code / payment password; the seller's receiving account
+in `payment.json` is meant to be shown to the buyer.
+
 ## Migration notes (from GitHub Pages + agent-friendly-mcp)
 
 - The old deployment was split: static JSON on GitHub Pages

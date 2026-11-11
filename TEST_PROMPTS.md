@@ -1,4 +1,4 @@
-# Test prompts — order tracking + seller admin (v1.2.0)
+# Test prompts — order tracking + seller admin (v1.3.0)
 
 Consumer-voice prompts for the new order lifecycle. Each prompt is
 self-contained: paste it to a fresh agent with only the shop URL.
@@ -12,14 +12,19 @@ Shop URLs (canonical host):
 ## 19. 下单后不用我操心，订单有进展就告诉我
 
 > 帮我去陶土这家店逛逛，我平时喝水喝茶想买个杯子，预算 300 块以内。
-> 你推荐好、我确认下单之后，不用我再来问，你帮我盯着这个订单，
-> 状态变了就告诉我一声。
+> 你推荐好、我确认下单之后，把卖家的收款方式发我，我付完钱把交易单号给你，
+> 然后你再帮我盯着这个订单，状态变了就告诉我一声。
 
 Expected: agent recommends (mug first choice), confirms, asks for
-name/contact/address, creates the order, then says it will track the
-order automatically (checks every 6 hours, notifies on change, stops
-at completed/cancelled) — without the buyer having to remember the
-order id. No invented tracking page or push notification.
+name/contact/address, creates the order, then immediately sends the
+seller's configured payment methods with the receiving accounts
+(bank transfer / WeChat Pay / Alipay, from payment.json) and asks the
+buyer to pick one — it must NOT create the tracking task yet. After
+the buyer sends the transaction id and the agent submits the proof
+(order becomes payment_submitted), the agent starts tracking (checks
+every 6 hours, notifies on change, stops at completed/cancelled) —
+without the buyer having to remember the order id. No invented
+tracking page or push notification.
 
 ## 20. 我的订单到哪了
 
@@ -48,7 +53,24 @@ never claims a refund or a review flow that does not exist.
 Expected: agent reports the order is already cancelled (test data) or
 calls cancel_order for a pending_payment / payment_submitted order;
 for a paid order it must refuse and explain cancellation is only
-possible before payment (refunds are not supported in v1).
+possible before payment (refunds are not supported in v1). After a
+successful cancel, the agent must also cancel/delete the tracking
+task for that order (if one was created) and tell the buyer tracking
+has stopped — it must not keep polling a cancelled order.
+
+## 23. 下单、付款、交凭据一气呵成，再帮我盯着
+
+> 帮我去陶土这家店买个马克杯，预算 300 以内。下单后你把收款方式发我，
+> 我付完钱就把交易单号给你，你交完凭据再帮我盯着订单，有进展就告诉我。
+
+Expected: agent recommends/confirms/creates the order, sends the
+payment methods with the receiving accounts, and does NOT create a
+tracking task yet. Once the buyer replies with a transaction id, the
+agent submits the proof (order becomes payment_submitted) and only
+then creates the tracking task (6-hour checks, notify on change,
+stop at completed/cancelled, delete the task at the end). If the
+buyer instead says they don't want it before paying, the agent
+cancels the order and must not leave a tracking task behind.
 
 ## Seller admin checklist (manual — the admin is a web UI, not an agent flow)
 

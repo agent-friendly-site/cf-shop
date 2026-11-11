@@ -38,7 +38,7 @@
    },
    {
     "name": "create_order",
-    "description": "Create an order. Requires idempotency_key. Returns the order with payment instructions (offline payment). Status starts as pending_payment. Ask the buyer for name, contact and shipping address at the confirmation step (buyer_name / buyer_contact / shipping_address, optional).",
+    "description": "Create an order. Requires idempotency_key. Returns the order with payment instructions (offline payment). Status starts as pending_payment. Ask the buyer for name, contact and shipping address at the confirmation step (buyer_name / buyer_contact / shipping_address, optional). After create_order, send the buyer the payment instructions returned with the order (method + the seller's configured receiving account, verbatim) and wait for payment proof. Do NOT start tracking yet: tracking starts only after submit_payment_proof succeeds.",
     "readOnlyHint": false,
     "input": {
      "items": "array of {product_id: string, quantity: integer}",
@@ -51,7 +51,7 @@
    },
    {
     "name": "submit_payment_proof",
-    "description": "Submit offline payment proof for an order: transaction id and payment method. The order becomes payment_submitted (awaiting seller verification), NOT paid. The seller must then verify the actual receipt and amount with confirm_payment. Never send card numbers or verification codes.",
+    "description": "Submit offline payment proof for an order: transaction id and payment method (if the buyer sends a screenshot of the transfer receipt, read the transaction id from it first). The order becomes payment_submitted (awaiting seller verification), NOT paid. The seller must then verify the actual receipt and amount with confirm_payment. After a successful call, start tracking the order (check get_order every 6 hours, notify on change, until completed or cancelled; delete the tracking task if the order is cancelled). Never ask the buyer for their own card numbers or verification codes.",
     "readOnlyHint": false,
     "input": {
      "order_id": "string",
@@ -98,7 +98,7 @@
    },
    {
     "name": "cancel_order",
-    "description": "Cancel an order before it is paid. Only pending_payment and payment_submitted orders can be cancelled; a paid order cannot be cancelled this way.",
+    "description": "Cancel an order before it is paid. Only pending_payment and payment_submitted orders can be cancelled; a paid order cannot be cancelled this way. After a successful cancel, also cancel/delete the tracking task for this order if one was created.",
     "readOnlyHint": false,
     "input": {
      "order_id": "string",

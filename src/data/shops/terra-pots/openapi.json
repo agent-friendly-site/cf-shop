@@ -2,7 +2,7 @@
  "openapi": "3.1.0",
  "info": {
   "title": "Terra Pots Ceramics — Agent API",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Hand-thrown stoneware mugs and plates, made in Jingdezhen. Agent-first storefront at https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/ Paths in this document are absolute from the host root, e.g. /shops/terra-pots/llms.txt."
  },
  "servers": [
