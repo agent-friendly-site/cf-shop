@@ -25,7 +25,7 @@ npm test             # 线上 E2E（Python + curl 打线上 Worker）
 npm run seed         # 从 src/data 同步商品/政策到 D1（要账号和库 ID 参数）
 ```
 
-部署：目前走 `cf.py worker-put`（见“部署”一节），不是 `wrangler deploy`。
+部署：Phase 0 已验证，走 `npx wrangler deploy`（见“部署”一节）；cf.py 仅兜底。
 测试：`tests/test_client.py`（MCP 全流程）、`tests/test_admin.py`（后台）。
 
 ## 目录
@@ -70,17 +70,16 @@ wrangler.toml      绑定（D1、R2）和触发器
 - Worker 名 `agent-friendly-platform`，账号 `b74b5f1383b4c12d7d98a26b462e7c22`，
   D1 `agent-friendly-orders`（`dd3c36b4-a260-4fc5-9da2-b9b06ccfb1cc`），
   R2 `agent-friendly-proofs`（绑定 `PROOFS`）。
-- 部署命令（构建 + 上传，绑定 D1 + R2）：
+- 部署命令（构建 + 上传；`wrangler.toml` 已含 D1/R2/cron）：
   ```bash
-  node scripts/build.mjs
-  python3 ~/workspace/custom-connectors/custom.cloudflare/bin/cf.py worker-put \
-    b74b5f1383b4c12d7d98a26b462e7c22 agent-friendly-platform dist/worker.mjs \
-    --d1-binding DB:dd3c36b4-a260-4fc5-9da2-b9b06ccfb1cc \
-    --r2-binding PROOFS:agent-friendly-proofs
+  npm run build
+  npx wrangler deploy
   ```
-- 为什么不用 `wrangler deploy`：wrangler 用不了 vault 里的 token。
-  重构 Phase 0 会验证这条路（见 `docs/refactor-plan.md` §2.1），验证通过前不要换。
-- 每次部署记下返回的 `deployment_id`，回滚就靠它（重新部署上一个版本）。
+  需先 `npx wrangler login`（OAuth；token 不进仓库）。WSL 与 Windows
+  的 wrangler 凭证目录不同，换环境要重新 login 或同步 config。
+- Phase 0（2026-11-11）已验证 wrangler 可用；cf.py `worker-put` 保留为兜底，
+  不再作为默认路径。详见 `docs/refactor-plan.md` §2.2。
+- 每次部署记下返回的 Version ID / deployment_id，回滚就靠它。
 - 推送到 GitHub 用 snapshot-push 流程（本仓库不是 git checkout）：
   先读 `/opt/hatch/connectors/github/references/snapshot-push.md`，
   按那份流程走：核对远端 head、更新 `~/workspace/cf-shop-paths.txt` 清单、
@@ -96,8 +95,9 @@ wrangler.toml      绑定（D1、R2）和触发器
 - **D1 `/batch` 在这个账号上 404**：写 D1 一次只调一条语句。
 - **cron 触发器**：账号免费版上限 5 个/账号，已满；本 Worker 只有 1 个触发器
   （每分钟 `* * * * *`）。新建/修改触发器后要等约 15 分钟才会第一次触发，
-  别刚建完就断定它坏了。触发器用 API 设置（cf.py 有 `worker-schedules-get/put`），
-  PUT 的 body 是裸 JSON 数组 `[{"cron": "..."}]`，不是 `{"schedules": [...]}`。
+  别刚建完就断定它坏了。现在由 `wrangler.toml` `[triggers]` + `wrangler deploy`
+  应用；若走 API，PUT body 是裸 JSON 数组 `[{"cron": "..."}]`，不是
+  `{"schedules": [...]}`。
 - **workers.dev 有 Browser Integrity Check**：自动化请求要带浏览器 UA。
 - **MCP 没有图片上传**：买家截图走一次性上传链接（v1.6.0），不许改回让 agent 读图。
 - **文字规则卡不住流程**：v1.4.1 的“下单前必须问地址”被盲测绕过，
@@ -113,9 +113,8 @@ wrangler.toml      绑定（D1、R2）和触发器
 
 - v1.7.0 已上线：15 分钟未付款自动取消、上传链接交截图、卖家核验、
   跟踪 + 后台管理。全部功能见 `README.md` 的版本记录。
-- 进行中：`docs/refactor-plan.md` 的 v2.0 重构（Hono + TypeScript，
-  Phase 1–6）。前端已定 HonoX（Hall 2026-11-11 选定）：HonoX 0.1.x alpha，
-  React 渲染器（BYOR）+ Tailwind v4 + shadcn/ui + TanStack Query，
-  只接后台和上传页两个页面，API/MCP 不迁文件路由；Phase 0 先跑 spike 验证，
-  不通过不进 Phase 5。接手时先读那份计划，按阶段做，不要跳阶段。
+- 进行中：`docs/refactor-plan.md` 的 v2.0 重构。**Phase 0 已通过**
+  （wrangler deploy + HonoX React spike，见 `spike-honox/`），下一步 Phase 1 地基。
+  前端已定 HonoX 0.1.62（pin 死）+ React 渲染器 + Tailwind v4 + shadcn/ui；
+  只接后台和上传页，API/MCP 不迁文件路由。接手时先读计划，按阶段做，不要跳阶段。
 - 待 Hall 手动做的事：关 GitHub Pages；在真机上点一遍后台和上传页（Phase 5 检查点）。

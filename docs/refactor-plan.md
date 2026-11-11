@@ -1,8 +1,9 @@
 # 重构计划 — agent-friendly-platform v2.0（Hono + TS）
 
-> 状态：计划中，未开始执行。本文是重构的需求文档，不是执行记录。
-> 执行时每个阶段都要能独立部署、独立验证；重构不改变任何对外行为，
-> 除非本文件明确写出。业务规则见附录 A（重构期间这些规则一个字都不动）。
+> 状态：**Phase 0 已通过（2026-11-11）**，可进 Phase 1。本文是重构的需求文档；
+> Phase 0 结论见 §2.2 末尾。执行时每个阶段都要能独立部署、独立验证；
+> 重构不改变任何对外行为，除非本文件明确写出。业务规则见附录 A
+> （重构期间这些规则一个字都不动）。
 
 ## 0. 背景与目标
 
@@ -188,6 +189,30 @@ Hall 2026-11-11 定：前端走 HonoX。以下四条是写进计划的约束，
 兜底也不通则回 Phase 0 重新定前端方案，**不要带着未验证的选型进 Phase 5**。
 
 两种结果都要在 README 里写清最终采用的部署命令。
+
+#### Phase 0 结论（2026-11-11）
+
+**（a）部署：通过 → 定稿 `wrangler deploy`**
+
+- 本机没有 vault/`cf.py` 路径；用 `npx wrangler login`（OAuth）验证。
+- `npm run build` + `npx wrangler deploy` 成功部署生产 Worker
+  `agent-friendly-platform`：D1/R2 绑定正确，cron `* * * * *` 由 deploy 应用，
+  `/health`、MCP `tools/list`、店铺 `llms.txt` 冒烟通过。
+- 生产 Version ID（本次）：`c051a92a-df44-4fdb-8837-7a2d899426db`。
+- cf.py 退为可选兜底（D1/R2 运维仍可用）；日常部署改走 wrangler。
+
+**（b）HonoX spike：4 项全过 → React 渲染器路线可进 Phase 5**
+
+- 代码在 `spike-honox/`（独立 Worker `agent-friendly-honox-spike`，不碰生产）。
+- 混合挂载：`createApp({ trailingSlash: true })` + `app.route('/', api)`，
+  `/shops/:shop/mcp` 与 `/shops/:shop/admin/` 共存无冲突。
+  注意：生产路径带尾斜杠，HonoX 需 `trailingSlash: true`。
+- React 岛 SSR + 水合、Tailwind v4、shadcn-style Dialog 线上可点：
+  登录 → 列表 → 详情 Dialog → 确认收款（金额不符拒绝 / 相符变 paid）。
+- 两遍构建 OK。产物（spike）：Worker upload **664 KiB / gzip 132 KiB**，
+  startup **12 ms**（对比生产 esbuild 单包 ~1325 KiB / gzip 272 KiB / 32 ms）。
+  可接受；完整后台 + MCP SDK 合包后体积会再涨，Phase 5 再记一笔。
+- HonoX **pin `0.1.62`**（不写 `^`）。
 
 ## 3. 目标架构
 

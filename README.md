@@ -147,22 +147,27 @@ python3 scripts/gen_data_module.py
 
 ## Deploy
 
-Deployment is via the Cloudflare API helper, **not** `wrangler deploy`,
-because wrangler cannot use the vault-stored API token:
+Phase 0 (2026-11-11) verified **`npx wrangler deploy`** as the default path
+(OAuth via `npx wrangler login`; do not commit tokens). `wrangler.toml`
+already carries the D1, R2, and cron bindings.
 
 ```sh
 npm run build
-python3 ~/workspace/custom-connectors/custom.cloudflare/bin/cf.py worker-put \
-  <account-id> agent-friendly-platform dist/worker.mjs \
-  --d1-binding DB:<database-id>
-python3 ~/workspace/custom-connectors/custom.cloudflare/bin/cf.py worker-subdomain \
-  <account-id> agent-friendly-platform
+npx wrangler deploy
 ```
+
+Fallback (legacy): `cf.py worker-put` with explicit `--d1-binding` /
+`--r2-binding` if wrangler auth is unavailable. See `docs/refactor-plan.md`
+§2.2 for the Phase 0 decision record.
 
 Live at `https://agent-friendly-platform.refined-x.workers.dev`.
 Account `b74b5f1383b4c12d7d98a26b462e7c22`, D1 `agent-friendly-orders`
 `dd3c36b4-a260-4fc5-9da2-b9b06ccfb1cc`, workers.dev subdomain `refined-x`.
 No custom domain yet (by Hall's choice).
+
+HonoX spike (Phase 0b, separate Worker, not production):
+`https://agent-friendly-honox-spike.refined-x.workers.dev` — source in
+`spike-honox/` (pin `honox@0.1.62`).
 
 ## Tests
 

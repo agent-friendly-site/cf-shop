@@ -1,7 +1,8 @@
-# agent-friendly-platform — Cloudflare Workers + D1.
-# Deployment is via the Cloudflare API helper (cf.py worker-put), NOT
-# `wrangler deploy`, because wrangler cannot use the vault-stored API token.
-# This file documents the bindings and drives local dev (`npx wrangler dev`).
+# agent-friendly-platform — Cloudflare Workers + D1 + R2.
+# Phase 0 (2026-11-11): default deploy is `npx wrangler deploy`
+# (after `npx wrangler login`). cf.py worker-put remains a fallback.
+# This file is the source of bindings + cron for both deploy and
+# local dev (`npx wrangler dev`).
 name = "agent-friendly-platform"
 main = "dist/worker.mjs"
 compatibility_date = "2025-06-01"
@@ -22,9 +23,6 @@ bucket_name = "agent-friendly-proofs"
 # One trigger only: the account is on the Workers Free plan (5 cron
 # triggers per account, already at the cap), so the daily 02:00
 # trigger was replaced by the every-minute one. scheduled() runs
-# both sweeps on every firing: the auto-complete query is cheap and
-# usually finds nothing, and the unpaid-expiry sweep needs the
-# minute cadence. Cron triggers are set via the Cloudflare API
-# (PUT /workers/scripts/{name}/schedules), not by wrangler deploy here.
+# both sweeps on every firing. wrangler deploy applies this block.
 [triggers]
 crons = ["* * * * *"]
