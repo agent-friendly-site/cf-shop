@@ -236,6 +236,16 @@ ships → buyer confirms receipt. Cancelling an order also deletes its
 tracking task. `never_in_chat` now means the *buyer's* card number /
 verification code / payment password; the seller's receiving account
 in `payment.json` is meant to be shown to the buyer.
+Update buyer info (v1.4.0, 2026-11-11, from the blind test of v1.3.0):
+the test agent created an order before asking for buyer info, and MCP
+had no way to attach it afterwards — the order's buyer fields stayed
+null. New MCP tool `update_buyer_info` (12 tools total): fill in or
+correct buyer_name / buyer_contact / shipping_address after
+`create_order`, at least one field required, only given fields change,
+allowed while the order is pending_payment, payment_submitted or paid,
+frozen once shipped; the change is recorded in the order timeline as
+`buyer_info_updated` so the seller can see it. `guide.md` now tells
+the agent to use it instead of asking the buyer to place a new order.
 
 ## Migration notes (from GitHub Pages + agent-friendly-mcp)
 

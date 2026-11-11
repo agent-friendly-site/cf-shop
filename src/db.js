@@ -374,6 +374,66 @@ export async function cancelOrder(db, { orderId, reason, actor = "buyer" }) {
   });
 }
 
+// Buyer-side step: fill in or correct buyer info (name / contact /
+// shipping address) after the order was created without it. Allowed
+// while the order is pending_payment, payment_submitted or paid —
+// once shipped the address is frozen (the parcel is already on its
+// way). Only the fields given are changed; at least one is required.
+// The change is recorded in the order_events timeline (event
+// buyer_info_updated, same status as from/to) so the seller can see
+// when the address was filled in.
+export async function updateBuyerInfo(db, { orderId, buyerName, buyerContact, shippingAddress }) {
+  const order = await getOrder(db, orderId);
+  if (!order) {
+    const e = new Error(`unknown order_id: ${orderId}`);
+    e.code = -32602;
+    throw e;
+  }
+  if (["shipped", "completed", "cancelled"].includes(order.status)) {
+    const e = new Error(`order ${orderId} is ${order.status}; buyer info can no longer be changed`);
+    e.code = -32000;
+    throw e;
+  }
+  const fields = [];
+  const check = (value, col, label) => {
+    if (value === undefined) return;
+    if (typeof value !== "string" || !value.trim()) {
+      const e = new Error(`${col} must be a non-empty string`);
+      e.code = -32602;
+      throw e;
+    }
+    fields.push({ col, val: value.trim(), label });
+  };
+  check(buyerName, "buyer_name", "姓名");
+  check(buyerContact, "buyer_contact", "联系方式");
+  check(shippingAddress, "shipping_address", "收货地址");
+  if (fields.length === 0) {
+    const e = new Error("at least one of buyer_name, buyer_contact, shipping_address is required");
+    e.code = -32602;
+    throw e;
+  }
+  const now = new Date().toISOString();
+  const sets = ["updated_at = ?"];
+  const params = [now];
+  for (const f of fields) {
+    sets.push(`${f.col} = ?`);
+    params.push(f.val);
+  }
+  params.push(order.id);
+  const update = db.prepare(`UPDATE orders SET ${sets.join(", ")} WHERE id = ?`).bind(...params);
+  const evt = writeEvent(db, {
+    orderId: order.id,
+    event: "buyer_info_updated",
+    fromStatus: order.status,
+    toStatus: order.status,
+    actor: "buyer",
+    note: `补填/修改收货信息：${fields.map((f) => f.label).join("、")}`,
+    now,
+  });
+  await db.batch([update, evt]);
+  return getOrder(db, order.id);
+}
+
 // Daily scheduled job: auto-complete orders shipped more than
 // AUTO_COMPLETE_AFTER_DAYS ago with no buyer confirmation.
 // Old orders without shipped_at are never auto-completed.

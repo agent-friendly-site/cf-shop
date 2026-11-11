@@ -1,4 +1,4 @@
-# Test prompts — order tracking + seller admin (v1.3.0)
+# Test prompts — order tracking + seller admin (v1.4.0)
 
 Consumer-voice prompts for the new order lifecycle. Each prompt is
 self-contained: paste it to a fresh agent with only the shop URL.
@@ -71,6 +71,19 @@ then creates the tracking task (6-hour checks, notify on change,
 stop at completed/cancelled, delete the task at the end). If the
 buyer instead says they don't want it before paying, the agent
 cancels the order and must not leave a tracking task behind.
+
+## 24. 下单时忘了给地址，之后再补
+
+> 帮我去陶土这家店买个马克杯，预算 300 以内。下单确认时我没给收货信息，
+> 下单成功后我再告诉你：收货人 测试买家，联系方式 test@example.com，
+> 地址 测试省测试市测试路 1 号。
+
+Expected: agent does NOT ask the buyer to place a new order; it calls
+update_buyer_info with the info given after the order was created, then
+confirms with get_order that buyer_name / buyer_contact /
+shipping_address are filled in and the timeline has a buyer_info_updated
+event. (v1.4.0 fix for the blind-test finding: an order created without
+buyer info could not be patched afterwards.)
 
 ## Seller admin checklist (manual — the admin is a web UI, not an agent flow)
 

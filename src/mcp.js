@@ -12,6 +12,8 @@
 // confirm_payment / mark_shipped are seller-side; in this demo the MCP
 // tools have no seller authentication — the seller admin web UI
 // (/shops/:shop/admin/) is the authenticated path (API key per shop).
+// update_buyer_info fills in buyer info after create_order without
+// changing the order status (allowed until the order ships).
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import * as db from "./db.js";
@@ -42,7 +44,7 @@ function publicProduct(p) {
 export function createMcpServer(env, shop) {
   const server = new McpServer({
     name: "agent-friendly-platform",
-    version: "1.3.0",
+    version: "1.4.0",
   });
 
   server.registerTool(
@@ -124,7 +126,7 @@ export function createMcpServer(env, shop) {
     {
       title: "Create order",
       description:
-        "Create an order. Requires idempotency_key. Order starts as pending_payment; payment is offline, instructions are returned with the order. Ask the buyer for name, contact and shipping address at the confirmation step and pass them as buyer_name / buyer_contact / shipping_address (all optional, but the seller needs an address to ship). After a successful create_order, send the buyer the payment instructions returned with the order (payment method + the seller's configured receiving account, verbatim) and wait for the buyer to pay offline and submit proof. Do NOT start tracking this order yet: tracking starts only after submit_payment_proof succeeds.",
+        "Create an order. Requires idempotency_key. Order starts as pending_payment; payment is offline, instructions are returned with the order. Ask the buyer for name, contact and shipping address at the confirmation step and pass them as buyer_name / buyer_contact / shipping_address (all optional, but the seller needs an address to ship). If the buyer only gives their name/contact/address after the order was created, use update_buyer_info to fill it in (allowed until the order ships). After a successful create_order, send the buyer the payment instructions returned with the order (payment method + the seller's configured receiving account, verbatim) and wait for the buyer to pay offline and submit proof. Do NOT start tracking this order yet: tracking starts only after submit_payment_proof succeeds.",
       inputSchema: {
         items: z.array(ItemShape),
         idempotency_key: z.string(),
@@ -293,6 +295,33 @@ export function createMcpServer(env, shop) {
       return text({
         order,
         note: `Order ${order_id} is now cancelled. Also cancel/delete the tracking task for this order (if one exists) and tell the buyer tracking has stopped — do not keep polling it.`,
+      });
+    }
+  );
+
+  server.registerTool(
+    "update_buyer_info",
+    {
+      title: "Update buyer info",
+      description:
+        "Fill in or correct the buyer info (name, contact, shipping address) for an order that was created without it. Use this when the buyer gives their name/contact/address only after the order was created — for example when they provide it together with the payment proof. At least one of buyer_name / buyer_contact / shipping_address is required; only the given fields change, the rest stay as they were. Allowed while the order is pending_payment, payment_submitted or paid; once the order is shipped the address is frozen and the tool errors. The change is recorded in the order timeline (event buyer_info_updated) so the seller can see it. Do not create a new order just to fix buyer info.",
+      inputSchema: {
+        order_id: z.string(),
+        buyer_name: z.string().optional(),
+        buyer_contact: z.string().optional(),
+        shipping_address: z.string().optional(),
+      },
+    },
+    async ({ order_id, buyer_name, buyer_contact, shipping_address }) => {
+      const order = await db.updateBuyerInfo(env.DB, {
+        orderId: order_id,
+        buyerName: buyer_name,
+        buyerContact: buyer_contact,
+        shippingAddress: shipping_address,
+      });
+      return text({
+        order,
+        note: `Buyer info updated for order ${order_id}. Verify with get_order: buyer_name / buyer_contact / shipping_address now show the new values, and the timeline has a buyer_info_updated event.`,
       });
     }
   );

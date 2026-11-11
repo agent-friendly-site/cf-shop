@@ -127,11 +127,29 @@ def main():
     print(f"\nTIMELINE: {events}")
     assert events == ["order_created", "payment_proof_submitted", "payment_confirmed", "shipped", "receipt_confirmed"], f"unexpected timeline: {events}"
     assert final["status"] == "completed", "expected completed"
-    # A second order: cancel before paying must work.
+    # Updating buyer info on a completed order must fail (frozen once shipped).
+    res = tool("update_buyer_info", {"order_id": order["id"], "buyer_name": "改名"})
+    assert res.get("result", {}).get("isError") is True, f"expected update_buyer_info on completed to fail, got: {res}"
+    print("\nUPDATE_BUYER_INFO ON COMPLETED ORDER REJECTED")
+    # A second order: created WITHOUT buyer info, then filled in afterwards.
     key2 = f"test-{uuid.uuid4().hex[:12]}"
     res = tool("create_order", {"items": [{"product_id": "tp-plate-20", "quantity": 1}],
                                 "idempotency_key": key2})
     order2 = json.loads(res["result"]["content"][0]["text"])["order"]
+    assert order2["buyer_name"] is None, "expected no buyer info at creation"
+    # No fields at all must fail.
+    res = tool("update_buyer_info", {"order_id": order2["id"]})
+    assert res.get("result", {}).get("isError") is True, f"expected update_buyer_info with no fields to fail, got: {res}"
+    print("\nUPDATE_BUYER_INFO WITH NO FIELDS REJECTED")
+    res = tool("update_buyer_info", {"order_id": order2["id"],
+                                     "buyer_name": "测试买家", "buyer_contact": "test@example.com",
+                                     "shipping_address": "测试省测试市测试路 1 号"})
+    updated = json.loads(res["result"]["content"][0]["text"])["order"]
+    print(f"\nAFTER UPDATE_BUYER_INFO: {updated['buyer_name']} / {updated['buyer_contact']} / {updated['shipping_address']}")
+    assert updated["buyer_name"] == "测试买家" and updated["shipping_address"].endswith("1 号"), "buyer info not updated"
+    assert updated["status"] == "pending_payment", "update must not change status"
+    assert [e["event"] for e in updated["timeline"]] == ["order_created", "buyer_info_updated"], f"unexpected timeline: {[e['event'] for e in updated['timeline']]}"
+    print("BUYER_INFO_UPDATED EVENT RECORDED")
     res = tool("cancel_order", {"order_id": order2["id"], "reason": "test: buyer changed mind"})
     cancelled = json.loads(res["result"]["content"][0]["text"])["order"]
     print(f"\nCANCELLED ORDER: {cancelled['id']}  STATUS: {cancelled['status']}")

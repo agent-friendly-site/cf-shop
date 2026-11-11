@@ -2,7 +2,7 @@
  "openapi": "3.1.0",
  "info": {
   "title": "agent-friendly-site — Platform API ",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "platform index. Shop APIs live at /shops/:shop/openapi.json."
  },
  "servers": [
