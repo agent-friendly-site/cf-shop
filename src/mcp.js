@@ -18,6 +18,10 @@
 // buyer can submit a payment screenshot directly to the platform (R2):
 // the image never goes through the agent, so the agent must NOT try to
 // read a transaction id out of a screenshot — hand the buyer the link.
+// Unpaid orders auto-cancel 15 minutes after creation (v1.7.0): the
+// agent must tell the buyer the deadline when sending payment
+// instructions; only pending_payment orders expire, payment_submitted
+// never does (the seller needs time to verify).
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import * as db from "./db.js";
@@ -48,7 +52,7 @@ function publicProduct(p) {
 export function createMcpServer(env, shop) {
   const server = new McpServer({
     name: "agent-friendly-platform",
-    version: "1.6.0",
+    version: "1.7.0",
   });
 
   server.registerTool(
@@ -130,7 +134,7 @@ export function createMcpServer(env, shop) {
     {
       title: "Create order",
       description:
-        "Create an order. Requires idempotency_key. Order starts as pending_payment; payment is offline, instructions are returned with the order. shipping_address is REQUIRED: create_order rejects the call when it is missing or empty — the seller cannot ship without an address, so there is no way to create an order without one. Before calling create_order, ask the buyer for name, contact and shipping address at the confirmation step and pass them as buyer_name / buyer_contact (optional) and shipping_address (required). Ask first, create the order only after you have the address. Do NOT create the order first and ask afterwards. If the buyer refuses to give an address, explain the order cannot be created without one; a missing or wrong address can be fixed later with update_buyer_info (allowed until the order ships). After a successful create_order, send the buyer the payment instructions returned with the order (payment method + the seller's configured receiving account, verbatim) and the proof-upload link returned with the order, and wait for the buyer to pay offline and submit proof. Proof has two paths: (a) the buyer sends a transaction id in chat — submit it with submit_payment_proof; (b) the buyer has a payment screenshot — do NOT try to read the transaction id out of it yourself, send the buyer the proof-upload link so they upload the screenshot directly to the platform. Do NOT start tracking this order yet: tracking starts only after a proof is submitted and the order becomes payment_submitted.",
+        "Create an order. Requires idempotency_key. Order starts as pending_payment; payment is offline, instructions are returned with the order. shipping_address is REQUIRED: create_order rejects the call when it is missing or empty — the seller cannot ship without an address, so there is no way to create an order without one. Before calling create_order, ask the buyer for name, contact and shipping address at the confirmation step and pass them as buyer_name / buyer_contact (optional) and shipping_address (required). Ask first, create the order only after you have the address. Do NOT create the order first and ask afterwards. If the buyer refuses to give an address, explain the order cannot be created without one; a missing or wrong address can be fixed later with update_buyer_info (allowed until the order ships). After a successful create_order, send the buyer the payment instructions returned with the order (payment method + the seller's configured receiving account, verbatim) and the proof-upload link returned with the order, and wait for the buyer to pay offline and submit proof. The order auto-cancels if no payment proof is submitted within 15 minutes of creation — tell the buyer this 15-minute deadline when you send the payment instructions. Proof has two paths: (a) the buyer sends a transaction id in chat — submit it with submit_payment_proof; (b) the buyer has a payment screenshot — do NOT try to read the transaction id out of it yourself, send the buyer the proof-upload link so they upload the screenshot directly to the platform. Do NOT start tracking this order yet: tracking starts only after a proof is submitted and the order becomes payment_submitted.",
       inputSchema: {
         items: z.array(ItemShape),
         idempotency_key: z.string(),
@@ -162,6 +166,11 @@ export function createMcpServer(env, shop) {
           summary: "线下支付：确认订单后卖家提供收款方式，买家在 Agent 外付款，付款后提交付款凭据，卖家核验到账后发货。",
         },
         total_verbatim: t.verbatim,
+        payment_deadline: {
+          minutes: db.UNPAID_EXPIRY_MINUTES,
+          expires_at: order.payment_expires_at,
+          note: "请在 15 分钟内付款并提交凭据，超时订单自动取消；交了凭据就不会过期。",
+        },
         proof_upload: {
           url: link.url,
           expires_at: link.expires_at,
@@ -212,7 +221,7 @@ export function createMcpServer(env, shop) {
     {
       title: "Get payment proof upload link",
       description:
-        "Get a one-time upload link for the buyer to submit a payment screenshot directly to the platform. Use this whenever the buyer has a payment screenshot (or says they will send one) instead of a transaction id: do NOT try to read the transaction id out of the screenshot yourself — send the buyer this link and let them open it in a browser and upload the image. The image goes straight to the platform (R2 storage) and the order becomes payment_submitted; the seller verifies the screenshot visually in the admin UI. The link is single-use and expires in 7 days; if it is used or expired, call this tool again for a fresh link. After the buyer confirms the upload (or get_order shows payment_submitted), start tracking this order: check get_order every 6 hours and tell the buyer when the status changes, until it reaches completed or cancelled; if the order is cancelled, delete the tracking task.",
+        "Get a one-time upload link for the buyer to submit a payment screenshot directly to the platform. Use this whenever the buyer has a payment screenshot (or says they will send one) instead of a transaction id: do NOT try to read the transaction id out of the screenshot yourself — send the buyer this link and let them open it in a browser and upload the image. The image goes straight to the platform (R2 storage) and the order becomes payment_submitted; the seller verifies the screenshot visually in the admin UI. The link is single-use and expires in 7 days; if it is used or expired, call this tool again for a fresh link. Note: the order itself auto-cancels 15 minutes after creation if no proof is submitted, so the link is only useful within that 15-minute payment window. After the buyer confirms the upload (or get_order shows payment_submitted), start tracking this order: check get_order every 6 hours and tell the buyer when the status changes, until it reaches completed or cancelled; if the order is cancelled, delete the tracking task.",
       inputSchema: { order_id: z.string() },
     },
     async ({ order_id }) => {
@@ -226,7 +235,7 @@ export function createMcpServer(env, shop) {
         status: order.status,
         upload_url: link.url,
         expires_at: link.expires_at,
-        how: "把这个链接发给买家：买家在浏览器里打开，直接上传付款截图（JPG/PNG/WebP/GIF，5MB 以内），图片直达平台，不经过你识别。上传成功后订单变为 payment_submitted，卖家在后台看图核对金额后确认收款。",
+        how: "把这个链接发给买家：买家在浏览器里打开，直接上传付款截图（JPG/PNG/WebP/GIF，5MB 以内），图片直达平台，不经过你识别。上传成功后订单变为 payment_submitted，卖家在后台看图核对金额后确认收款。注意：订单在下单 15 分钟后没交凭据会自动取消，链接要在 15 分钟内用。",
         tracking:
           "买家传完截图、订单变为 payment_submitted 之后，再为这个订单建跟踪任务：每 6 小时查一次 get_order，有变化就告诉买家，直到订单完成或取消；订单取消时一并删除跟踪任务。",
       });

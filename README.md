@@ -284,6 +284,27 @@ for transaction ids sent as text only. Migration `0005` adds
 `proof_type` / R2 columns to `payment_proofs` (existing proofs
 kept) and the `proof_upload_tokens` table.
 
+v1.7.0 (same day, Hall's decision — 15-minute auto-cancel):
+an order with no payment proof auto-cancels 15 minutes after
+creation. `db.expireUnpaidOrders` runs from the Worker's
+`scheduled()` handler on an every-minute cron trigger (`* * * * *`).
+The old daily 02:00 UTC trigger was replaced by it: the account is
+on the Workers Free plan (5 cron triggers per account, already at
+the cap), so the Worker keeps one trigger and `scheduled()` runs
+both sweeps on every firing — the auto-complete query is cheap and
+usually finds nothing. Each
+cancellation goes through `transitionOrder()` (event
+`auto_cancelled`, actor `system`, reason "下单 15 分钟未付款，
+自动取消"). Only `pending_payment` orders expire — once a proof is
+submitted the order never expires, so the seller always has time
+to verify. `create_order` returns `payment_deadline` (15 minutes,
+`expires_at`) and the order carries `payment_expires_at` while
+pending; `guide.md` / `mcp.json` / `llms.txt` / `agent.json` all
+tell the agent to state the deadline when sending payment
+instructions. The upload link stays 7 days, but it is only useful
+within the 15-minute window — after auto-cancel it is refused.
+No migration: expiry uses the existing `created_at` + events.
+
 ## Migration notes (from GitHub Pages + agent-friendly-mcp)
 
 - The old deployment was split: static JSON on GitHub Pages

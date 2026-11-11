@@ -146,3 +146,11 @@ GET/PUT /shops/:shop/admin/api/policies
 - 统一方案（全客户端通用）：一次性上传链接。`create_order` 直接返回 `proof_upload.url`；新工具 `get_payment_proof_upload_link` 可随时再取一个。链接一次有效、7 天过期，D1 只存 token 的 SHA-256 哈希。买家在浏览器里打开链接上传截图（JPG/PNG/WebP/GIF，5MB 以内），图片直存私有 R2 桶 `agent-friendly-proofs`（Worker 绑定 `PROOFS`），订单变为 `payment_submitted`——agent 全程不读图。`submit_payment_proof` 只负责文字形式的交易单号；agent 收到截图时不许自己读单号，必须给链接。
 - 卖家侧：后台订单详情直接显示截图（仅限登录后的卖家，图片走鉴权接口，不公开）；买家没填金额时页面提示看图核对，在确认框里输入图上金额再确认收款，金额校验（必须等于订单总额）不变。
 - 实现：migration `0005`（`payment_proofs` 重建：`transaction_id` / `amount_cny` 改可空，新增 `proof_type` / `r2_key` / `file_name` / `mime_type` / `file_size`，16 条旧凭据原样保留；新增 `proof_upload_tokens` 表）；`src/proof_upload.js`（上传页 + multipart 上传接口）；`src/db.js`（token 发放/校验/核销、`addImagePaymentProof`）；`src/admin.js`（鉴权图片接口 + 详情页图片渲染 + 金额提示修正）；`cf.py` 新增 `r2-list` / `r2-create` 和 `--r2-binding`。
+
+## 十三、v1.7.0 未付款订单 15 分钟自动取消（2026-11-11，Hall 要求 15 分钟）
+
+- 之前：`pending_payment` 的订单没有过期机制，不付款就一直挂着，只有买家/卖家手动取消。
+- 规则：下单后 15 分钟内没交付款凭据，订单自动取消。只针对 `pending_payment`——交了凭据（`payment_submitted`）就永不过期，卖家有 24 小时核验，不会被扫掉。
+- 实现：`db.expireUnpaidOrders`（按 `created_at < now - 15 分钟` 查 `pending_payment`，每单走 `transitionOrder()`，事件 `auto_cancelled`，actor `system`，`cancel_reason` 写明“下单 15 分钟未付款，自动取消”）；Worker 的 `scheduled()` 每分钟跑一次（cron `* * * * *`）。账号是 Workers 免费版（全账号 5 个 cron 触发器上限，已满），所以每日 02:00 的自动完成触发器被每分钟这一个替换了——`scheduled()` 每次触发时两个扫表都跑，自动完成那条查询很便宜、通常查不到东西；`create_order` 返回 `payment_deadline`（15 分钟 + `expires_at`），订单在 `pending_payment` 时带 `payment_expires_at`；`guide.md` / `mcp.json` / `llms.txt` / `agent.json` 都要求 agent 发收款方式时就把 15 分钟期限告诉买家。上传链接还是 7 天有效，但订单 15 分钟后取消了链接也就没用了。
+- 注意：上线时已有的超期未付款订单（包括 Hall 自己的花瓶单 `ord_mwbs00xustqe`，15:06 下单一直没付款）会在第一次扫到时一起自动取消——这是新规则本身的要求，不是误删；要买得重新下单。
+- 无需 migration：过期判断只用已有的 `created_at` 和事件表。

@@ -217,6 +217,42 @@ def main():
     res = tool("get_payment_proof_upload_link", {"order_id": order2["id"]})
     assert res.get("result", {}).get("isError") is True, f"expected upload link on cancelled order to fail, got: {res}"
     print("UPLOAD LINK ON CANCELLED ORDER REJECTED")
+    # v1.7.0: unpaid orders auto-cancel 15 minutes after creation.
+    # create_order returns the payment deadline with the order.
+    key3 = f"test-{uuid.uuid4().hex[:12]}"
+    res = tool("create_order", {"items": [{"product_id": "tp-mug-300", "quantity": 1}],
+                                "idempotency_key": key3,
+                                "shipping_address": "测试省测试市测试路 1 号"})
+    created3 = json.loads(res["result"]["content"][0]["text"])
+    order3 = created3["order"]
+    assert order3["status"] == "pending_payment", "expected pending_payment"
+    assert created3.get("payment_deadline", {}).get("minutes") == 15, f"expected 15-minute deadline, got: {created3.get('payment_deadline')}"
+    assert order3.get("payment_expires_at"), "expected payment_expires_at on a pending_payment order"
+    print(f"\nORDER3: {order3['id']}  EXPIRES AT: {order3['payment_expires_at']}")
+    # Backdate the order 20 minutes so the per-minute sweep picks it up.
+    import subprocess as _sp
+    cf = ["python3", "/home/hatch/workspace/custom-connectors/custom.cloudflare/bin/cf.py",
+          "d1-query", "b74b5f1383b4c12d7d98a26b462e7c22", "dd3c36b4-a260-4fc5-9da2-b9b06ccfb1cc"]
+    sql = f"UPDATE orders SET created_at = datetime('now', '-20 minutes') WHERE id = '{order3['id']}'"
+    out = _sp.run(cf + [sql], capture_output=True, text=True)
+    assert out.returncode == 0 and json.loads(out.stdout).get("success") is True, f"backdate failed: {out.stdout[:300]} {out.stderr[:300]}"
+    print("ORDER3 BACKDATED 20 MINUTES")
+    # The per-minute cron sweep should cancel it within ~60s; poll up to 120s.
+    import time as _time
+    status = None
+    final3 = None
+    deadline = _time.time() + 120
+    while _time.time() < deadline:
+        final3 = json.loads(tool("get_order", {"order_id": order3["id"]})["result"]["content"][0]["text"])["order"]
+        status = final3["status"]
+        if status == "cancelled":
+            break
+        _time.sleep(10)
+    assert status == "cancelled", f"expected auto-cancel within 120s, last status: {status}"
+    assert [e["event"] for e in final3["timeline"]] == ["order_created", "auto_cancelled"], f"unexpected timeline: {[e['event'] for e in final3['timeline']]}"
+    assert "15 分钟" in (final3.get("cancel_reason") or ""), f"expected 15-minute cancel reason, got: {final3.get('cancel_reason')}"
+    assert final3.get("cancelled_at"), "expected cancelled_at set"
+    print(f"\nORDER3 AUTO-CANCELLED: {final3['id']}  REASON: {final3['cancel_reason']}")
     print("\nE2E PASS")
 
 

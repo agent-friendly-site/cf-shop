@@ -2,7 +2,7 @@
  "openapi": "3.1.0",
  "info": {
   "title": "Paper Lantern Stationery — Agent API",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "Notebooks and pens for people who still write by hand. Agent-first storefront at https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/ Paths in this document are absolute from the host root, e.g. /shops/paper-lantern/llms.txt."
  },
  "servers": [

@@ -33,7 +33,7 @@ import * as db from "./db.js";
 import { dataFile } from "./data.js";
 
 const BASE = "https://agent-friendly-platform.refined-x.workers.dev";
-const VERSION = "1.6.0";
+const VERSION = "1.7.0";
 
 const app = new Hono();
 
@@ -300,17 +300,24 @@ app.all("/shops/:shop/mcp", async (c) => {
 
 app.notFound((c) => notFound(c, `not found: ${c.req.path}`));
 
-// Daily scheduled job (cron trigger, see wrangler.toml): auto-complete
-// orders shipped more than 7 days ago with no buyer confirmation.
-async function scheduledAutoComplete(env) {
+// Scheduled jobs (cron triggers, see wrangler.toml): every minute,
+// auto-cancel unpaid orders older than UNPAID_EXPIRY_MINUTES and
+// auto-complete orders shipped more than 7 days ago with no buyer
+// confirmation. One trigger only — the account is on the Workers
+// Free plan (5 cron triggers per account, already at the cap) — so
+// the old daily 02:00 trigger was replaced by the every-minute one;
+// the auto-complete query is cheap and usually finds nothing.
+async function scheduledJobs(env) {
+  const expired = await db.expireUnpaidOrders(env.DB, db.UNPAID_EXPIRY_MINUTES);
+  console.log(`expire-unpaid: ${expired.length} orders auto-cancelled`, expired);
   const done = await db.autoCompleteShipped(env.DB, db.AUTO_COMPLETE_AFTER_DAYS);
   console.log(`auto-complete: ${done.length} orders completed`, done);
-  return done;
+  return { expired, done };
 }
 
 export default {
   fetch: app.fetch,
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(scheduledAutoComplete(env));
+    ctx.waitUntil(scheduledJobs(env));
   },
 };

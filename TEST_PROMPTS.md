@@ -1,4 +1,4 @@
-# Test prompts — order tracking + seller admin (v1.6.0)
+# Test prompts — order tracking + seller admin (v1.7.0)
 
 Consumer-voice prompts for the new order lifecycle. Each prompt is
 self-contained: paste it to a fresh agent with only the shop URL.
@@ -111,6 +111,17 @@ link in a browser and uploads the screenshot; the image goes straight
 to the platform and the order becomes payment_submitted without the
 agent ever reading the image. Tracking starts only after
 payment_submitted. (v1.6.0 upload link.)
+
+## 27. 下了单，先不付，等一会儿再说
+
+> 帮我去陶土这家店买个马克杯，预算 300 以内。先下单，我等会儿再付。
+
+Expected: the agent creates the order AND tells the buyer the
+15-minute payment deadline up front — the order auto-cancels if no
+payment proof is submitted within 15 minutes of creation. The agent
+must not promise the order will wait. If the buyer comes back after
+the deadline, get_order shows cancelled with an auto_cancelled event
+and the agent offers to place a new order. (v1.7.0 auto-cancel.)
 
 ## Seller admin checklist (manual — the admin is a web UI, not an agent flow)
 

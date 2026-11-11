@@ -50,7 +50,7 @@ Render from api/presentation.json (canonical IR). - Text is the contract, UI is 
 - Numbered options, not buttons: '1. 手冲 — 喜欢花果香、清爽' and 'Reply with the number'.
 - Links, not embedded actions: product and checkout are plain Markdown links.
 - Totals verbatim, once: print the authoritative total; do not recompute or reformat it.
-- Confirm before money moves. Payment is offline: the seller provides payment instructions, the buyer pays outside the agent, then submits proof — a transaction id via submit_payment_proof, or a payment screenshot via the one-time upload link (the image goes straight to the platform, the agent never reads it). Never send card numbers or verification codes in chat.
+- Confirm before money moves. Payment is offline: the seller provides payment instructions, the buyer pays outside the agent, then submits proof — a transaction id via submit_payment_proof, or a payment screenshot via the one-time upload link (the image goes straight to the platform, the agent never reads it). Unpaid orders auto-cancel 15 minutes after creation if no proof is submitted; once a proof is submitted the order never expires. Never send card numbers or verification codes in chat.
 - Degrade the catalogue, not the truth: text shows at most 5 products; never truncate a price, stock status, or total.
 
 Adapters: Muse = clickable options / cards; Claude = MCP Apps widget (platform-owned template) + elicitation for one blocking choice; Grok / generic = Markdown only.
@@ -64,9 +64,9 @@ Adapters: Muse = clickable options / cards; Claude = MCP Apps widget (platform-o
 
 ## Payment (offline)
 
-下单成功后，Agent 立即把卖家配置的收款方式（含收款账号）发给买家；买家在 Agent 外付款，付款后提交凭据：交易单号直接发给 Agent；付款截图用上传链接在浏览器里直接上传，不经过 Agent 识别；凭据提交后 Agent 才开始跟踪订单；卖家 24 小时内核验到账后发货。不要向买家索要买家自己的银行卡号、验证码、支付密码。
+下单成功后，Agent 立即把卖家配置的收款方式（含收款账号）发给买家；买家在 Agent 外付款（15 分钟内付款并提交凭据，超时订单自动取消），付款后提交凭据：交易单号直接发给 Agent；付款截图用上传链接在浏览器里直接上传，不经过 Agent 识别；凭据提交后 Agent 才开始跟踪订单；卖家 24 小时内核验到账后发货。不要向买家索要买家自己的银行卡号、验证码、支付密码。
 
-流程：确认订单（先问清姓名、联系方式、收货地址，收货地址必填，问清了再下单）→ Agent 发收款方式（payment.json，含收款账号）→ 买家线下付款 → 提交付款凭据（交易单号用 submit_payment_proof 提交，传 order_id、payment_method、transaction_id；付款截图用上传链接直接上传，图片不经过 Agent 识别；订单变为待核验 payment_submitted）→ 建跟踪任务（每 6 小时查 get_order）→ 卖家 24 小时内核对到账和金额，用 confirm_payment 确认（金额必须等于订单总额）→ 已付款 → 卖家发货（mark_shipped，可填快递公司和单号）→ 买家确认收货（confirm_receipt，订单完成；发货满 7 天无人确认自动完成）。付款前买家或卖家可用 cancel_order 取消订单，取消成功后立即删除跟踪任务。订单状态变化都会记在 get_order 返回的 timeline 里。
+流程：确认订单（先问清姓名、联系方式、收货地址，收货地址必填，问清了再下单）→ Agent 发收款方式（payment.json，含收款账号），并告诉买家 15 分钟内付款交凭据、超时订单自动取消 → 买家线下付款 → 提交付款凭据（交易单号用 submit_payment_proof 提交，传 order_id、payment_method、transaction_id；付款截图用上传链接直接上传，图片不经过 Agent 识别；订单变为待核验 payment_submitted）→ 建跟踪任务（每 6 小时查 get_order）→ 卖家 24 小时内核对到账和金额，用 confirm_payment 确认（金额必须等于订单总额）→ 已付款 → 卖家发货（mark_shipped，可填快递公司和单号）→ 买家确认收货（confirm_receipt，订单完成；发货满 7 天无人确认自动完成）。付款前买家或卖家可用 cancel_order 取消订单，取消成功后立即删除跟踪任务。订单状态变化都会记在 get_order 返回的 timeline 里。
 
 ## Muse rich UI — how to show this shop
 

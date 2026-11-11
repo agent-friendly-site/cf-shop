@@ -59,6 +59,11 @@ const TRANSITIONS = {
 
 export const AUTO_COMPLETE_AFTER_DAYS = 7;
 
+// Unpaid orders auto-cancel this many minutes after creation (v1.7.0).
+// Only pending_payment orders expire: once a proof is submitted the
+// seller needs time to verify, so payment_submitted never expires.
+export const UNPAID_EXPIRY_MINUTES = 15;
+
 export async function sha256Hex(text) {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -186,6 +191,11 @@ function orderShape(row, proofs, timeline) {
     verified_amount_cny: row.verified_amount_cny ?? null,
     verified_at: row.verified_at ?? null,
     verification_note: row.verification_note ?? null,
+    // Payment deadline (v1.7.0): only pending_payment orders have one.
+    payment_expires_at:
+      row.status === "pending_payment"
+        ? new Date(new Date(row.created_at).getTime() + UNPAID_EXPIRY_MINUTES * 60 * 1000).toISOString()
+        : null,
     created_at: row.created_at,
     updated_at: row.updated_at,
     proofs: proofs || [],
@@ -544,6 +554,32 @@ export async function updateBuyerInfo(db, { orderId, buyerName, buyerContact, sh
   });
   await db.batch([update, evt]);
   return getOrder(db, order.id);
+}
+
+// Scheduled job (v1.7.0): auto-cancel pending_payment orders that
+// have had no payment proof for more than `minutes` minutes. Runs
+// from the Worker's scheduled() handler (every-minute cron trigger).
+// Each cancellation goes through transitionOrder() so the timeline
+// records it (event auto_cancelled, actor system).
+export async function expireUnpaidOrders(db, minutes = UNPAID_EXPIRY_MINUTES) {
+  const cutoff = new Date(Date.now() - minutes * 60 * 1000).toISOString();
+  const stale = await rows(
+    db,
+    "SELECT * FROM orders WHERE status = 'pending_payment' AND created_at < ? ORDER BY created_at",
+    cutoff
+  );
+  const cancelled = [];
+  for (const row of stale) {
+    const order = await getOrder(db, row.id);
+    const now = new Date().toISOString();
+    const reason = `下单 ${minutes} 分钟未付款，自动取消`;
+    const done = await transitionOrder(db, order, "cancelled", "auto_cancelled", "system", reason, {
+      cancelled_at: now,
+      cancel_reason: reason,
+    });
+    cancelled.push(done.id);
+  }
+  return cancelled;
 }
 
 // Daily scheduled job: auto-complete orders shipped more than
