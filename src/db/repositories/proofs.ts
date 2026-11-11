@@ -1,3 +1,9 @@
+import {
+  assertCanConfirmPayment,
+  assertCanSubmitProof,
+  canSubmitProof,
+  matchProofUploadToken,
+} from "../../domain/payment";
 import { DomainRpcError, PROOF_UPLOAD_TTL_DAYS, sha256Hex, writeEvent } from "../shared";
 import { getOrder, transitionOrder } from "./orders";
 
@@ -20,12 +26,7 @@ export async function addPaymentProof(
   // moves the order to payment_submitted (awaiting seller verification).
   // A proof on an already-paid (or later) order is rejected: the payment
   // is already verified and must not be re-opened by a new proof.
-  if (order.status !== "pending_payment" && order.status !== "payment_submitted") {
-    throw new DomainRpcError(
-      `order ${orderId} is already ${order.status}; cannot submit a payment proof`,
-      -32000,
-    );
-  }
+  assertCanSubmitProof(orderId, order.status);
   const wasPending = order.status === "pending_payment";
   const now = new Date().toISOString();
   const id = `proof_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -69,7 +70,7 @@ export async function createProofUploadToken(
   if (order.shop !== shop) {
     throw new DomainRpcError(`order ${orderId} does not belong to shop ${shop}`, -32602);
   }
-  if (!["pending_payment", "payment_submitted"].includes(order.status)) {
+  if (!canSubmitProof(order.status)) {
     throw new DomainRpcError(
       `order ${orderId} is ${order.status}; a payment proof can no longer be uploaded`,
       -32000,
@@ -107,11 +108,7 @@ export async function verifyProofUploadToken(
     expires_at: string;
     token_hash: string;
   } | null;
-  if (!row) return null;
-  if (row.shop !== shop || row.order_id !== orderId) return null;
-  if (row.used_at) return null;
-  if (new Date(row.expires_at).getTime() < Date.now()) return null;
-  return row;
+  return matchProofUploadToken(row, { shop, orderId });
 }
 
 export async function consumeProofUploadToken(db: D1Database, tokenHash: string): Promise<void> {
@@ -145,12 +142,7 @@ export async function addImagePaymentProof(
 ) {
   const order = await getOrder(db, orderId);
   if (!order) return null;
-  if (order.status !== "pending_payment" && order.status !== "payment_submitted") {
-    throw new DomainRpcError(
-      `order ${orderId} is already ${order.status}; cannot submit a payment proof`,
-      -32000,
-    );
-  }
+  assertCanSubmitProof(orderId, order.status);
   const wasPending = order.status === "pending_payment";
   const now = new Date().toISOString();
   const id = `proof_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -203,24 +195,7 @@ export async function confirmPayment(
   if (!order) {
     throw new DomainRpcError(`unknown order_id: ${orderId}`, -32602);
   }
-  if (order.status !== "payment_submitted") {
-    throw new DomainRpcError(
-      `order ${orderId} is ${order.status}, not payment_submitted; only an order awaiting verification can be confirmed`,
-      -32000,
-    );
-  }
-  if (!order.proofs || order.proofs.length === 0) {
-    throw new DomainRpcError(
-      `order ${orderId} has no payment proof; cannot confirm payment`,
-      -32000,
-    );
-  }
-  if (verifiedAmountCny !== order.total_cny) {
-    throw new DomainRpcError(
-      `verified amount ${verifiedAmountCny} CNY does not match order total ${order.total_cny} CNY; order stays payment_submitted`,
-      -32000,
-    );
-  }
+  assertCanConfirmPayment(order, verifiedAmountCny);
   const now = new Date().toISOString();
   return transitionOrder(db, order, "paid", "payment_confirmed", "seller", note || null, {
     verified_amount_cny: verifiedAmountCny,
