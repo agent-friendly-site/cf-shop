@@ -1,3 +1,4 @@
+import { assertCanTransition, canUpdateBuyerInfo, paymentExpiresAt } from "../../domain/order";
 import {
   AUTO_COMPLETE_AFTER_DAYS,
   DomainRpcError,
@@ -16,18 +17,6 @@ import {
   UNPAID_EXPIRY_MINUTES,
   writeEvent,
 } from "../shared";
-
-// Allowed transitions: from-status -> [to-statuses]. Every status change
-// must go through transitionOrder() so the order_events timeline is
-// written together with the status update (one D1 batch, atomic).
-const TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  pending_payment: ["payment_submitted", "cancelled"],
-  payment_submitted: ["paid", "cancelled"],
-  paid: ["shipped"],
-  shipped: ["completed"],
-  completed: [],
-  cancelled: [],
-};
 
 export interface OrderTotals {
   lines: OrderLineItem[];
@@ -94,12 +83,7 @@ function orderShape(row: OrderRow, proofs: PaymentProof[], timeline: OrderEvent[
     verified_at: row.verified_at ?? null,
     verification_note: row.verification_note ?? null,
     // Payment deadline (v1.7.0): only pending_payment orders have one.
-    payment_expires_at:
-      row.status === "pending_payment"
-        ? new Date(
-            new Date(row.created_at).getTime() + UNPAID_EXPIRY_MINUTES * 60 * 1000,
-          ).toISOString()
-        : null,
+    payment_expires_at: paymentExpiresAt(row.created_at, row.status),
     created_at: row.created_at,
     updated_at: row.updated_at,
     proofs: proofs || [],
@@ -183,9 +167,7 @@ export async function transitionOrder(
   extra: Record<string, unknown> = {},
 ): Promise<Order | null> {
   const from = order.status;
-  if (!(TRANSITIONS[from] || []).includes(toStatus)) {
-    throw new DomainRpcError(`order ${order.id} is ${from}; cannot move to ${toStatus}`, -32000);
-  }
+  assertCanTransition(order.id, from, toStatus);
   const now = new Date().toISOString();
   const sets = ["status = ?", "updated_at = ?"];
   const params: unknown[] = [toStatus, now];
@@ -342,7 +324,7 @@ export async function updateBuyerInfo(
   if (!order) {
     throw new DomainRpcError(`unknown order_id: ${orderId}`, -32602);
   }
-  if (["shipped", "completed", "cancelled"].includes(order.status)) {
+  if (!canUpdateBuyerInfo(order.status)) {
     throw new DomainRpcError(
       `order ${orderId} is ${order.status}; buyer info can no longer be changed`,
       -32000,

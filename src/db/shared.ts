@@ -1,24 +1,20 @@
 // Shared types, constants, and D1 helpers for db/repositories.
 // Phase 2.2: extracted from the former god module without behavior changes.
+// Phase 3.1: constants + DomainRpcError live in domain/; re-exported here
+// so existing `from "../shared"` imports keep working.
 
-export class DomainRpcError extends Error {
-  code: number;
-  constructor(message: string, code: number) {
-    super(message);
-    this.code = code;
-  }
-}
+export {
+  AUTO_COMPLETE_AFTER_DAYS,
+  FREE_SHIPPING_OVER,
+  ORDER_STATUSES,
+  type OrderStatus,
+  PROOF_UPLOAD_TTL_DAYS,
+  SHIPPING_FLAT,
+  UNPAID_EXPIRY_MINUTES,
+} from "../domain/constants";
+export { DomainRpcError } from "../domain/errors";
 
-export const ORDER_STATUSES = [
-  "pending_payment",
-  "payment_submitted",
-  "paid",
-  "shipped",
-  "completed",
-  "cancelled",
-] as const;
-
-export type OrderStatus = (typeof ORDER_STATUSES)[number];
+import type { OrderStatus } from "../domain/constants";
 
 export interface Shop {
   slug: string;
@@ -144,12 +140,6 @@ export interface OrderRow {
   created_at: string;
   updated_at: string;
 }
-
-export const SHIPPING_FLAT = 12;
-export const FREE_SHIPPING_OVER = 200;
-export const AUTO_COMPLETE_AFTER_DAYS = 7;
-export const UNPAID_EXPIRY_MINUTES = 15;
-export const PROOF_UPLOAD_TTL_DAYS = 7;
 
 export async function rows<T extends object = Record<string, unknown>>(
   db: D1Database,
