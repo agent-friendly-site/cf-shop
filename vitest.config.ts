@@ -19,7 +19,7 @@ function textModules() {
 }
 
 export default defineConfig(async () => {
-  const migrations = await readD1Migrations(path.join(import.meta.dirname, "migrations"));
+  const migrations = await readD1Migrations(path.join(import.meta.dirname, "drizzle"));
   return {
     plugins: [
       textModules(),

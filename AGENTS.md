@@ -41,7 +41,7 @@ src/
   data.ts          生成的静态文件 import map（别手改，用 scripts/gen_data_module.py 生成）
   env.ts           Env 类型（DB / PROOFS）
   data/            店铺事实：商品、价格、政策、guide、mcp.json 等（改事实只改这里）
-migrations/        D1 建表 SQL（0001–0005）
+drizzle/           D1 migrations（drizzle-kit；旧 0001–0005 在 migrations/archive/）
 tests/             Python 线上 E2E
 scripts/           Python 运维脚本（seed、生成 key、改店铺事实）
 spike-honox/       Phase 0 HonoX spike（独立 Worker，不进生产路径）
@@ -120,8 +120,8 @@ tsconfig.json      TypeScript strict
 
 - v1.7.0 已上线：15 分钟未付款自动取消、上传链接交截图、卖家核验、
   跟踪 + 后台管理。全部功能见 `README.md` 的版本记录。
-- 进行中：`docs/refactor-plan.md` 的 v2.0 重构。**Phase 0 + Phase 1 已完成**
-  （wrangler、HonoX spike、TS strict、Biome、Vitest 本地 D1）。下一步 Phase 2 Drizzle。
+- 进行中：`docs/refactor-plan.md` 的 v2.0 重构。**Phase 0 + Phase 1 + Phase 2.1–2.3 已完成**
+ （wrangler、HonoX spike、TS、Biome、Vitest、Drizzle schema/repos/migrations）。下一步 Phase 2.4 seed.ts。
   前端已定 HonoX 0.1.62（pin 死）+ React 渲染器 + Tailwind v4 + shadcn/ui；
   只接后台和上传页，API/MCP 不迁文件路由。接手时先读计划，按阶段做，不要跳阶段。
   注：`@cloudflare/vitest-pool-workers` 已更名为 `@cloudflare/vitest-plugin`，Phase 1.5 用后者。

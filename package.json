@@ -10,6 +10,8 @@
     "gen-data": "python3 scripts/gen_data_module.py",
     "seed": "python3 scripts/seed.py",
     "build": "node scripts/build.mjs",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate:local": "wrangler d1 migrations apply agent-friendly-orders --local",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "format": "biome check --write .",

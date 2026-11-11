@@ -11,7 +11,9 @@ compatibility_date = "2025-06-01"
 binding = "DB"
 database_name = "agent-friendly-orders"
 database_id = "dd3c36b4-a260-4fc5-9da2-b9b06ccfb1cc"
-migrations_dir = "migrations"
+# Phase 2.3: drizzle-kit owns migrations (baseline in drizzle/).
+# Hand-written 0001–0005 live in migrations/archive/ for history only.
+migrations_dir = "drizzle"
 
 # Payment-proof screenshots (v1.6.0, one-time upload link): private R2
 # bucket, served only through the authenticated admin image endpoint.
