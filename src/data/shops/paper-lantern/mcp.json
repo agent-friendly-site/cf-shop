@@ -1,0 +1,97 @@
+{
+ "mcp": {
+  "endpoint": "https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/mcp",
+  "transport": "Streamable HTTP",
+  "protocol_version": "2025-06-18",
+  "status": "live",
+  "note": "Live MCP server on Cloudflare Workers (agent-friendly-platform, Hono + D1). POST this endpoint with JSON-RPC initialize, then tools/list, then tools/call. Catalog and orders are served from D1.",
+  "tools": [
+   {
+    "name": "list_products",
+    "description": "List all products with price and stock.",
+    "readOnlyHint": true
+   },
+   {
+    "name": "get_product",
+    "description": "Get one product by id.",
+    "readOnlyHint": true,
+    "input": {
+     "product_id": "string"
+    }
+   },
+   {
+    "name": "recommend_products",
+    "description": "Recommend 1 first choice + 1 alternative based on use and budget. Read guide.md / recommendations.json first.",
+    "readOnlyHint": true,
+    "input": {
+     "use": "string",
+     "budget_cny": "number"
+    }
+   },
+   {
+    "name": "calculate_total",
+    "description": "Calculate subtotal, shipping (12 CNY, free over 200 CNY) and total for a list of items.",
+    "readOnlyHint": true,
+    "input": {
+     "items": "array of {product_id: string, quantity: integer}"
+    }
+   },
+   {
+    "name": "create_order",
+    "description": "Create an order. Requires idempotency_key. Returns the order with payment instructions (offline payment). Status starts as pending_payment.",
+    "readOnlyHint": false,
+    "input": {
+     "items": "array of {product_id: string, quantity: integer}",
+     "idempotency_key": "string",
+     "buyer_note": "string (optional)"
+    }
+   },
+   {
+    "name": "get_order",
+    "description": "Get an order by id, including payment and shipping status.",
+    "readOnlyHint": true,
+    "input": {
+     "order_id": "string"
+    }
+   },
+   {
+    "name": "submit_payment_proof",
+    "description": "Submit offline payment proof for an order: transaction id and payment method. Submitting a transaction id marks the order paid (verification is simulated: a real deployment must verify receipt first — see api/payment.json, seller verifies within 24h). Never send card numbers or verification codes.",
+    "readOnlyHint": false,
+    "input": {
+     "order_id": "string",
+     "payment_method": "string",
+     "transaction_id": "string",
+     "amount_cny": "number"
+    }
+   }
+  ],
+  "presentation": {
+   "mcp_apps": {
+    "extension": "io.modelcontextprotocol/ui",
+    "mime_type": "text/html;profile=mcp-app",
+    "resource": "ui://paper-lantern/product-list",
+    "status": "documented",
+    "note": "Platform-owned widget template, fed by tool structuredContent (the IR). The shop never ships HTML/CSS. Tools MUST return meaningful text content even when UI is available. Renders on Claude web/desktop and ChatGPT; Claude Code shows text only; Grok does not render MCP Apps."
+   },
+   "elicitation": {
+    "use_for": "One blocking choice or confirm (flat JSON Schema, enums), Claude Code only. URL mode for payment/sign-in only.",
+    "never_for": [
+     "sensitive data",
+     "payment credentials",
+     "catalogue or cart"
+    ],
+    "note": "claude.ai web elicitation support is unverified; do not depend on it there."
+   },
+   "grok": {
+    "rendering": "Markdown/text only. No rich-UI convention for third parties."
+   },
+   "fallback": "Markdown text from api/presentation.json markdown_fallback. Numbered options, plain links, one question per turn, total verbatim."
+  },
+  "payment": {
+   "method": "offline",
+   "descriptor": "https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/api/payment.json",
+   "note": "确认订单后，卖家提供线下收款方式；买家在 Agent 外付款，付款后把交易单号发给 Agent；卖家核验到账后发货。不要在聊天里索要或接收银行卡号、验证码。Verification note: the Worker marks the order paid when a transaction id is submitted (simulated verification); a real deployment must verify receipt first."
+  }
+ }
+}

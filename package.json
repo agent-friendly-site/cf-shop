@@ -1,0 +1,29 @@
+{
+  "name": "cf-shop",
+  "version": "1.0.0",
+  "description": "agent-friendly multi-merchant platform: one Hono Worker + D1 on Cloudflare. Agent-only storefronts at /shops/:shop/ with llms.txt discovery and a live MCP endpoint.",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "import-data": "python3 scripts/import_data.py",
+    "gen-data": "python3 scripts/gen_data_module.py",
+    "seed": "python3 scripts/seed.py",
+    "build": "node scripts/build.mjs",
+    "dev": "wrangler dev",
+    "test": "python3 tests/test_client.py"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "hono": "^4.13.17",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "wrangler": "^4.160.0"
+  },
+  "type": "module"
+}

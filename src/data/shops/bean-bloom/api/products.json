@@ -1,0 +1,44 @@
+{
+ "shop": "bean-bloom",
+ "name": "Bean Bloom Coffee",
+ "url": "https://agent-friendly-platform.refined-x.workers.dev/shops/bean-bloom/",
+ "currency": "CNY",
+ "products": [
+  {
+   "id": "bb-yirg-250",
+   "name": "Yirgacheffe Light Roast 250g",
+   "name_zh": "耶加雪菲浅烘 250g",
+   "price": 68,
+   "currency": "CNY",
+   "stock": 42,
+   "description": "Floral, citrus, light roast. Whole bean.",
+   "url": "https://agent-friendly-platform.refined-x.workers.dev/shops/bean-bloom/api/products.json#bb-yirg-250",
+   "image_url": "https://live.staticflickr.com/3911/14562943389_228c092592_b.jpg",
+   "image_credit": "Roasted coffee beans by AndreasPoike, CC BY 2.0, via Openverse (Flickr). Illustrative photo, not the actual product."
+  },
+  {
+   "id": "bb-cold-500",
+   "name": "Cold Brew Blend 500g",
+   "name_zh": "冷萃拼配 500g",
+   "price": 88,
+   "currency": "CNY",
+   "stock": 27,
+   "description": "Chocolate, nutty, low acidity. For cold brew.",
+   "url": "https://agent-friendly-platform.refined-x.workers.dev/shops/bean-bloom/api/products.json#bb-cold-500",
+   "image_url": "https://live.staticflickr.com/7345/13610569685_fd92f96f23_b.jpg",
+   "image_credit": "Cold brew coffee by shalommama, CC BY 2.0, via Openverse (Flickr). Illustrative photo, not the actual product."
+  },
+  {
+   "id": "bb-decaf-250",
+   "name": "Decaf Medium Roast 250g",
+   "name_zh": "低因中烘 250g",
+   "price": 72,
+   "currency": "CNY",
+   "stock": 0,
+   "description": "Swiss Water decaf. Out of stock.",
+   "url": "https://agent-friendly-platform.refined-x.workers.dev/shops/bean-bloom/api/products.json#bb-decaf-250",
+   "image_url": "https://live.staticflickr.com/4114/4904143161_3fe2ed651d_b.jpg",
+   "image_credit": "Roasted coffee beans by originsroasters, CC BY-SA 2.0, via Openverse (Flickr). Illustrative photo, not the actual product."
+  }
+ ]
+}

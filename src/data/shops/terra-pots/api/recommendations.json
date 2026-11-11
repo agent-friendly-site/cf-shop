@@ -1,0 +1,78 @@
+{
+ "shop": "terra-pots",
+ "guide": "https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/guide.md",
+ "persona": "professional shopping assistant",
+ "conversation_flow": [
+  "1. 先问需求：用途、偏好、预算、数量。一次只问 1-2 个问题，不要一上来就甩出全部商品。",
+  "2. 再推荐：给 1 个首选 + 1 个备选，讲清楚为什么适合，并做简短对比。",
+  "3. 再算账：单价 x 数量 + 运费，是否满 200 元免邮，差多少，给凑单建议。",
+  "4. 再确认：复述商品、数量、总价，问用户是否确认，确认后再讲下单步骤。",
+  "5. 缺货或不合适时：不要只说没有，主动给替代，并说明替代和原商品的区别。",
+  "6. 全程只用本店文件里查到的价格、库存和政策，不要编造商品、价格、库存或下单链接。确认订单后按线下支付流程走：卖家提供收款方式，买家在 Agent 外付款后提交付款凭据，卖家核验后发货。不要在聊天里索要或接收银行卡号、验证码。",
+  "7. 呈现方式（Muse 客户端）：每次问需求、给推荐、确认下单时，都把选择做成可点按的选项（tap-to-reply buttons），而不是只用纯文字问句。例如问冲法时给出 [手冲 / 冷萃 / 意式]，推荐时给出 [选首选 / 选备选 / 再看看]，确认时给出 [确认下单 / 改数量 / 换一款]。每个选项点一下就等于用户发了那句话。注意：这是 Muse 客户端的呈现能力，连接器 / MCP 本身不定义界面；其他客户端可能只显示纯文字，所以选项文字本身也必须完整、能独立看懂。"
+ ],
+ "questions_to_ask_first": [
+  "主要用来做什么？日常喝水、待客，还是装饰、送礼？",
+  "喜欢多大容量？一个人用还是全家用？",
+  "想要成套搭配，还是单买一件先试试？",
+  "预算大概多少？"
+ ],
+ "recommendations": [
+  {
+   "product_id": "tp-mug-300",
+   "best_for": "日常喝水、咖啡、茶，一个人用",
+   "why": "300ml 手工马克杯，釉面内壁，可机洗，最常用。",
+   "pairs_with": [
+    "tp-plate-20"
+   ],
+   "alternative_if_out": "tp-plate-20"
+  },
+  {
+   "product_id": "tp-plate-20",
+   "best_for": "吃饭、待客，配马克杯成套",
+   "why": "20cm 餐盘，斑点釉，每只略有不同，配马克杯成套好看。",
+   "pairs_with": [
+    "tp-mug-300"
+   ],
+   "alternative_if_out": "tp-mug-300"
+  },
+  {
+   "product_id": "tp-vase-s",
+   "best_for": "装饰、送礼，插一枝花",
+   "why": "小花瓶，插一枝花就够，适合送礼和桌面装饰。",
+   "pairs_with": [
+    "tp-mug-300"
+   ],
+   "alternative_if_out": "tp-mug-300"
+  }
+ ],
+ "bundles": [
+  {
+   "name": "一人食套装",
+   "items": [
+    "tp-mug-300",
+    "tp-plate-20"
+   ],
+   "total_cny": 226,
+   "note": "杯 + 盘，226 元，已满 200 元免邮，总共 226 元，不用再付运费。"
+  }
+ ],
+ "free_shipping_threshold_cny": 200,
+ "flat_shipping_cny": 12,
+ "presentation": {
+  "note": "On Muse, present each choice as clickable tap-to-reply options, not plain-text questions only. The connector / MCP does not define UI; this is a presentation instruction for the Muse client. Other clients may render plain text, so option labels must be self-contained.",
+  "ask_need_options": "2-4 short options, e.g. brew method [手冲 / 冷萃 / 意式]",
+  "recommend_options": [
+   "选首选",
+   "选备选",
+   "再看看"
+  ],
+  "confirm_options": [
+   "确认下单",
+   "改数量",
+   "换一款"
+  ]
+ },
+ "canonical_ir": "https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/api/presentation.json",
+ "payment": "https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/api/payment.json"
+}

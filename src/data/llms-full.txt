@@ -1,0 +1,14 @@
+# agent-friendly-site — full corpus (, short)
+
+## Bean Bloom Coffee (晨光咖啡)
+Small-batch roasted coffee beans, shipped from Yunnan.
+URL: https://agent-friendly-platform.refined-x.workers.dev/shops/bean-bloom/
+Products: Yirgacheffe Light Roast 250g (68 CNY, stock 42), Cold Brew Blend 500g (88 CNY, stock 27), Decaf Medium Roast 250g (72 CNY, stock 0)
+## Paper Lantern Stationery (纸灯文具)
+Notebooks and pens for people who still write by hand.
+URL: https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/
+Products: A5 Dot Grid Notebook (38 CNY, stock 120), Gel Pen 0.5mm Black (3-pack) (18 CNY, stock 300), Washi Tape Set — Lantern (25 CNY, stock 64)
+## Terra Pots Ceramics (陶土手作)
+Hand-thrown stoneware mugs and plates, made in Jingdezhen.
+URL: https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/
+Products: Stoneware Mug 300ml (128 CNY, stock 15), Dinner Plate 20cm (98 CNY, stock 22), Small Bud Vase (158 CNY, stock 8)

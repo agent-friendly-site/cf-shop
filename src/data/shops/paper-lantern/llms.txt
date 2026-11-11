@@ -1,0 +1,41 @@
+## Presentation — render from api/presentation.json
+
+This shop ships data only, never HTML/CSS. Render from [api/presentation.json](https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/api/presentation.json) — the canonical IR. Markdown text is the contract; rich UI is progressive enhancement.
+
+- At most 5 products, as a Markdown table: 商品 | 价格 | 库存. Prices are {amount, currency}; print the total verbatim, do not recompute it.
+- One question per turn. In text, use numbered options ('1. 手冲 — 喜欢花果香、清爽', '请回复编号选择'). On Muse, the same options may be clickable buttons; on Claude, an MCP App may render them; on Grok, text only.
+- Product and checkout are plain Markdown links, not embedded actions. Actions in the IR are semantic (tool/args), at most 3.
+- Never request a Claude Artifact or Grok Studio canvas, never use <xaiArtifact>, never use elicitation for sensitive/payment data or a catalogue.
+
+## Shopping guide — read this before recommending
+
+Act as a professional shopping assistant, not a catalog lookup. First read guide.md and api/recommendations.json, then ask 1-2 questions about use, preference, budget and quantity before recommending. Recommend 1 first choice + 1 alternative with reasons, show the maths (price x quantity + shipping), check free shipping over 200 CNY, and confirm before talking about an order. If a product is out of stock, offer an alternative instead of stopping. Links: [guide.md](https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/guide.md), [recommendations](https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/api/recommendations.json).
+
+# Paper Lantern Stationery (纸灯文具)
+
+> Notebooks and pens for people who still write by hand.
+> Agent-only shop. Orders are placed through an agent; payment is offline.
+> Shop URL: https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/
+
+## Entry points
+- [Agent card](https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/agent.json)
+- [Agent card (well-known)](https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/.well-known/agent.json)
+- [OpenAPI](https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/openapi.json)
+- [Full corpus](https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/llms-full.txt)
+- [Catalog](https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/api/catalog.json)
+- [Products](https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/api/products.json)
+- [Policies](https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/policies.json)
+- [Payment (offline)](https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/api/payment.json)
+- [MCP descriptor](https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/mcp.json)
+- [Consumer starter prompt](https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/starter-prompt.txt)
+
+## What this shop sells
+- A5 Dot Grid Notebook — 38 CNY, stock 120. 192 pages, 100gsm, lay-flat binding.
+- Gel Pen 0.5mm Black (3-pack) — 18 CNY, stock 300. Smooth gel ink, quick-drying.
+- Washi Tape Set — Lantern — 25 CNY, stock 64. 4 rolls, paper tape, tear by hand.
+
+## How to interact
+- Read-only first: GET {shop}/api/products.json, then GET {shop}/policies.json.
+- Live MCP endpoint: POST https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/mcp, Streamable HTTP, protocol 2025-06-18. Tools: list_products, get_product, recommend_products, calculate_total, create_order, submit_payment_proof, get_order. See mcp.json.
+- The shop catalog is served from D1 on this Worker; the MCP endpoint above is the live server.
+- create_order: send an idempotency_key. The order starts as pending_payment; the seller provides offline payment instructions in the order confirmation.

@@ -1,0 +1,26 @@
+{
+ "shop": "terra-pots",
+ "name": "Terra Pots Ceramics",
+ "url": "https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/",
+ "currency": "CNY",
+ "products": [
+  {
+   "id": "tp-mug-300",
+   "name": "Stoneware Mug 300ml",
+   "price": 128,
+   "currency": "CNY"
+  },
+  {
+   "id": "tp-plate-20",
+   "name": "Dinner Plate 20cm",
+   "price": 98,
+   "currency": "CNY"
+  },
+  {
+   "id": "tp-vase-s",
+   "name": "Small Bud Vase",
+   "price": 158,
+   "currency": "CNY"
+  }
+ ]
+}

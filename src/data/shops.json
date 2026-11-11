@@ -1,0 +1,30 @@
+{
+ "platform": "https://agent-friendly-platform.refined-x.workers.dev",
+ "discovery": "GET {shop}/llms.txt, then {shop}/openapi.json, {shop}/agent.json, {shop}/api/products.json",
+ "shops": [
+  {
+   "slug": "bean-bloom",
+   "name": "Bean Bloom Coffee",
+   "name_zh": "晨光咖啡",
+   "url": "https://agent-friendly-platform.refined-x.workers.dev/shops/bean-bloom/",
+   "llms_txt": "https://agent-friendly-platform.refined-x.workers.dev/shops/bean-bloom/llms.txt",
+   "category": "coffee"
+  },
+  {
+   "slug": "paper-lantern",
+   "name": "Paper Lantern Stationery",
+   "name_zh": "纸灯文具",
+   "url": "https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/",
+   "llms_txt": "https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/llms.txt",
+   "category": "stationery"
+  },
+  {
+   "slug": "terra-pots",
+   "name": "Terra Pots Ceramics",
+   "name_zh": "陶土手作",
+   "url": "https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/",
+   "llms_txt": "https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/llms.txt",
+   "category": "ceramics"
+  }
+ ]
+}

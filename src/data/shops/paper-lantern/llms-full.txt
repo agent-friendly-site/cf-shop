@@ -1,0 +1,27 @@
+# Paper Lantern Stationery — full corpus
+
+Notebooks and pens for people who still write by hand.
+
+## Products
+### A5 Dot Grid Notebook (A5 点阵笔记本)
+- id: pl-note-a5
+- price: 38 CNY
+- stock: 120
+- 192 pages, 100gsm, lay-flat binding.
+
+### Gel Pen 0.5mm Black (3-pack) (中性笔 0.5mm 黑色 3 支装)
+- id: pl-pen-05
+- price: 18 CNY
+- stock: 300
+- Smooth gel ink, quick-drying.
+
+### Washi Tape Set — Lantern (和纸胶带套装·灯)
+- id: pl-washi-01
+- price: 25 CNY
+- stock: 64
+- 4 rolls, paper tape, tear by hand.
+
+## Policies
+- Shipping: flat 12 CNY, free over 200 CNY. Ships in 2 business days.
+- Returns: 7 days, unused, buyer pays return shipping.
+- Privacy: Order and delivery information only; never shared with third parties.

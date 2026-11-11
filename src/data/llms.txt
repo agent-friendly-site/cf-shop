@@ -1,0 +1,19 @@
+# agent-friendly-site
+
+> multi-merchant agent-first platform. One host, one shop per subdirectory. Shops are agent-only: no human shopping UI.
+
+## Platform
+- [Shops JSON](https://agent-friendly-platform.refined-x.workers.dev/shops.json)
+- [OpenAPI](https://agent-friendly-platform.refined-x.workers.dev/openapi.json)
+- [Platform agent card](https://agent-friendly-platform.refined-x.workers.dev/.well-known/agent.json)
+- [Discovery test](https://agent-friendly-platform.refined-x.workers.dev/DISCOVERY.md)
+
+## Shops
+- [Bean Bloom Coffee llms.txt](https://agent-friendly-platform.refined-x.workers.dev/shops/bean-bloom/llms.txt)
+- [Paper Lantern Stationery llms.txt](https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/llms.txt)
+- [Terra Pots Ceramics llms.txt](https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/llms.txt)
+
+## Discovery
+- Give an agent a shop URL, e.g. https://agent-friendly-platform.refined-x.workers.dev/shops/bean-bloom/
+- Agent fetches {shop}/llms.txt first, then {shop}/openapi.json, {shop}/agent.json, {shop}/api/products.json, {shop}/policies.json.
+- {shop}/mcp is a live POST Streamable HTTP endpoint at https://agent-friendly-platform.refined-x.workers.dev/shops/{shop}/mcp (protocol 2025-06-18, see {shop}/mcp.json). The catalog is served from D1 on this Worker.

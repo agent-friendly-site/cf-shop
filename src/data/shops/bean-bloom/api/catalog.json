@@ -1,0 +1,26 @@
+{
+ "shop": "bean-bloom",
+ "name": "Bean Bloom Coffee",
+ "url": "https://agent-friendly-platform.refined-x.workers.dev/shops/bean-bloom/",
+ "currency": "CNY",
+ "products": [
+  {
+   "id": "bb-yirg-250",
+   "name": "Yirgacheffe Light Roast 250g",
+   "price": 68,
+   "currency": "CNY"
+  },
+  {
+   "id": "bb-cold-500",
+   "name": "Cold Brew Blend 500g",
+   "price": 88,
+   "currency": "CNY"
+  },
+  {
+   "id": "bb-decaf-250",
+   "name": "Decaf Medium Roast 250g",
+   "price": 72,
+   "currency": "CNY"
+  }
+ ]
+}

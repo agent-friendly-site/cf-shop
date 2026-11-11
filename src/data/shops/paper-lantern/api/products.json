@@ -1,0 +1,44 @@
+{
+ "shop": "paper-lantern",
+ "name": "Paper Lantern Stationery",
+ "url": "https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/",
+ "currency": "CNY",
+ "products": [
+  {
+   "id": "pl-note-a5",
+   "name": "A5 Dot Grid Notebook",
+   "name_zh": "A5 点阵笔记本",
+   "price": 38,
+   "currency": "CNY",
+   "stock": 120,
+   "description": "192 pages, 100gsm, lay-flat binding.",
+   "url": "https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/api/products.json#pl-note-a5",
+   "image_url": "https://live.staticflickr.com/3136/2445114424_17c1d9d0b0.jpg",
+   "image_credit": "Notebook collection by Dvortygirl, CC BY-SA 2.0, via Openverse (Flickr). Illustrative photo, not the actual product."
+  },
+  {
+   "id": "pl-pen-05",
+   "name": "Gel Pen 0.5mm Black (3-pack)",
+   "name_zh": "中性笔 0.5mm 黑色 3 支装",
+   "price": 18,
+   "currency": "CNY",
+   "stock": 300,
+   "description": "Smooth gel ink, quick-drying.",
+   "url": "https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/api/products.json#pl-pen-05",
+   "image_url": "https://live.staticflickr.com/1431/884508865_6d250d36c5_b.jpg",
+   "image_credit": "Diary writing by freddie boy, CC BY-SA 2.0, via Openverse (Flickr). Illustrative photo, not the actual product."
+  },
+  {
+   "id": "pl-washi-01",
+   "name": "Washi Tape Set — Lantern",
+   "name_zh": "和纸胶带套装·灯",
+   "price": 25,
+   "currency": "CNY",
+   "stock": 64,
+   "description": "4 rolls, paper tape, tear by hand.",
+   "url": "https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/api/products.json#pl-washi-01",
+   "image_url": "https://live.staticflickr.com/4006/4372346011_348bf09bd3_b.jpg",
+   "image_credit": "Washi tape food picks by gamene, CC BY 2.0, via Openverse (Flickr). Illustrative photo, not the actual product."
+  }
+ ]
+}

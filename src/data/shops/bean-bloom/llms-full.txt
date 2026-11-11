@@ -1,0 +1,27 @@
+# Bean Bloom Coffee — full corpus
+
+Small-batch roasted coffee beans, shipped from Yunnan.
+
+## Products
+### Yirgacheffe Light Roast 250g (耶加雪菲浅烘 250g)
+- id: bb-yirg-250
+- price: 68 CNY
+- stock: 42
+- Floral, citrus, light roast. Whole bean.
+
+### Cold Brew Blend 500g (冷萃拼配 500g)
+- id: bb-cold-500
+- price: 88 CNY
+- stock: 27
+- Chocolate, nutty, low acidity. For cold brew.
+
+### Decaf Medium Roast 250g (低因中烘 250g)
+- id: bb-decaf-250
+- price: 72 CNY
+- stock: 0
+- Swiss Water decaf. Out of stock.
+
+## Policies
+- Shipping: flat 12 CNY, free over 200 CNY. Ships in 2 business days.
+- Returns: 7 days, unused, buyer pays return shipping.
+- Privacy: Order and delivery information only; never shared with third parties.

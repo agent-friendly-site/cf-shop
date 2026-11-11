@@ -1,0 +1,16 @@
+{
+ "@type": "AgentCard",
+ "name": "agent-friendly-site",
+ "url": "https://agent-friendly-platform.refined-x.workers.dev",
+ "description": "multi-merchant agent-first platform. One shop per subdirectory.",
+ "entry_points": {
+  "llms_txt": "https://agent-friendly-platform.refined-x.workers.dev/llms.txt",
+  "shops": "https://agent-friendly-platform.refined-x.workers.dev/shops.json",
+  "openapi": "https://agent-friendly-platform.refined-x.workers.dev/openapi.json"
+ },
+ "shops": [
+  "https://agent-friendly-platform.refined-x.workers.dev/shops/bean-bloom/",
+  "https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/",
+  "https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/"
+ ]
+}

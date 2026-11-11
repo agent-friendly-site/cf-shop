@@ -1,0 +1,23 @@
+{
+ "shop": "bean-bloom",
+ "shipping": {
+  "flat_fee_cny": 12,
+  "free_over_cny": 200,
+  "lead_time": "2 business days"
+ },
+ "returns": {
+  "window_days": 7,
+  "condition": "unused",
+  "return_shipping": "buyer pays"
+ },
+ "privacy": "Order and delivery information only; never shared with third parties. Never send card numbers or verification codes in chat.",
+ "payment": "https://agent-friendly-platform.refined-x.workers.dev/shops/bean-bloom/api/payment.json",
+ "order_statuses": [
+  "pending_payment",
+  "payment_submitted",
+  "paid",
+  "shipped",
+  "delivered",
+  "returned"
+ ]
+}

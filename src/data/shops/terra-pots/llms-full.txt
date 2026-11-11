@@ -1,0 +1,27 @@
+# Terra Pots Ceramics — full corpus
+
+Hand-thrown stoneware mugs and plates, made in Jingdezhen.
+
+## Products
+### Stoneware Mug 300ml (陶土马克杯 300ml)
+- id: tp-mug-300
+- price: 128 CNY
+- stock: 15
+- Hand-thrown, glazed interior, dishwasher safe.
+
+### Dinner Plate 20cm (陶土餐盘 20cm)
+- id: tp-plate-20
+- price: 98 CNY
+- stock: 22
+- Speckled glaze, each piece slightly different.
+
+### Small Bud Vase (小花瓶)
+- id: tp-vase-s
+- price: 158 CNY
+- stock: 8
+- Hand-thrown, holds a single stem.
+
+## Policies
+- Shipping: flat 12 CNY, free over 200 CNY. Ships in 2 business days.
+- Returns: 7 days, unused, buyer pays return shipping.
+- Privacy: Order and delivery information only; never shared with third parties.

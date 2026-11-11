@@ -1,0 +1,44 @@
+{
+ "shop": "terra-pots",
+ "name": "Terra Pots Ceramics",
+ "url": "https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/",
+ "currency": "CNY",
+ "products": [
+  {
+   "id": "tp-mug-300",
+   "name": "Stoneware Mug 300ml",
+   "name_zh": "陶土马克杯 300ml",
+   "price": 128,
+   "currency": "CNY",
+   "stock": 15,
+   "description": "Hand-thrown, glazed interior, dishwasher safe.",
+   "url": "https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/api/products.json#tp-mug-300",
+   "image_url": "https://live.staticflickr.com/7323/9539251014_37a60c07d5_b.jpg",
+   "image_credit": "Ceramic mug by Sam Howzit, CC BY 2.0, via Openverse (Flickr). Illustrative photo, not the actual product."
+  },
+  {
+   "id": "tp-plate-20",
+   "name": "Dinner Plate 20cm",
+   "name_zh": "陶土餐盘 20cm",
+   "price": 98,
+   "currency": "CNY",
+   "stock": 22,
+   "description": "Speckled glaze, each piece slightly different.",
+   "url": "https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/api/products.json#tp-plate-20",
+   "image_url": "https://live.staticflickr.com/8201/8182200136_de369a85d9_b.jpg",
+   "image_credit": "Ceramic dinner plate by Didriks, CC BY 2.0, via Openverse (Flickr). Illustrative photo, not the actual product."
+  },
+  {
+   "id": "tp-vase-s",
+   "name": "Small Bud Vase",
+   "name_zh": "小花瓶",
+   "price": 158,
+   "currency": "CNY",
+   "stock": 8,
+   "description": "Hand-thrown, holds a single stem.",
+   "url": "https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/api/products.json#tp-vase-s",
+   "image_url": "https://live.staticflickr.com/5535/10298454133_85b077c4c0_b.jpg",
+   "image_credit": "Green vase by Jocey K, CC BY-SA 2.0, via Openverse (Flickr). Illustrative photo, not the actual product."
+  }
+ ]
+}

@@ -1,0 +1,349 @@
+{
+ "version": "1",
+ "intent": "search_results",
+ "title": "Terra Pots Ceramics",
+ "narrative": "先问用途再推荐：日常用选马克杯，吃饭待客选餐盘配杯成套，装饰送礼选小花瓶。",
+ "products": [
+  {
+   "id": "tp-mug-300",
+   "name": "陶土马克杯 300ml",
+   "name_en": "Stoneware Mug 300ml",
+   "price": {
+    "amount": 128,
+    "currency": "CNY"
+   },
+   "stock": {
+    "status": "in_stock",
+    "quantity": 15
+   },
+   "product_url": "https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/api/products.json#tp-mug-300",
+   "attributes": [
+    {
+     "key": "描述",
+     "value": "Hand-thrown, glazed interior, dishwasher safe."
+    }
+   ],
+   "snippet": "Hand-thrown, glazed interior, dishwasher safe.",
+   "image_url": "https://live.staticflickr.com/7323/9539251014_37a60c07d5_b.jpg",
+   "image_credit": "Ceramic mug by Sam Howzit, CC BY 2.0, via Openverse (Flickr). Illustrative photo, not the actual product."
+  },
+  {
+   "id": "tp-plate-20",
+   "name": "陶土餐盘 20cm",
+   "name_en": "Dinner Plate 20cm",
+   "price": {
+    "amount": 98,
+    "currency": "CNY"
+   },
+   "stock": {
+    "status": "in_stock",
+    "quantity": 22
+   },
+   "product_url": "https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/api/products.json#tp-plate-20",
+   "attributes": [
+    {
+     "key": "描述",
+     "value": "Speckled glaze, each piece slightly different."
+    }
+   ],
+   "snippet": "Speckled glaze, each piece slightly different.",
+   "image_url": "https://live.staticflickr.com/8201/8182200136_de369a85d9_b.jpg",
+   "image_credit": "Ceramic dinner plate by Didriks, CC BY 2.0, via Openverse (Flickr). Illustrative photo, not the actual product."
+  },
+  {
+   "id": "tp-vase-s",
+   "name": "小花瓶",
+   "name_en": "Small Bud Vase",
+   "price": {
+    "amount": 158,
+    "currency": "CNY"
+   },
+   "stock": {
+    "status": "low_stock",
+    "quantity": 8
+   },
+   "product_url": "https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/api/products.json#tp-vase-s",
+   "attributes": [
+    {
+     "key": "描述",
+     "value": "Hand-thrown, holds a single stem."
+    }
+   ],
+   "snippet": "Hand-thrown, holds a single stem.",
+   "image_url": "https://live.staticflickr.com/5535/10298454133_85b077c4c0_b.jpg",
+   "image_credit": "Green vase by Jocey K, CC BY-SA 2.0, via Openverse (Flickr). Illustrative photo, not the actual product."
+  }
+ ],
+ "options": [
+  {
+   "id": "first_question",
+   "question": "主要用来做什么？",
+   "required": true,
+   "choices": [
+    {
+     "id": "daily",
+     "label": "日常喝水、喝茶",
+     "detail": "300ml 马克杯"
+    },
+    {
+     "id": "dining",
+     "label": "吃饭、待客",
+     "detail": "20cm 餐盘，配杯成套"
+    },
+    {
+     "id": "decor",
+     "label": "装饰、送礼",
+     "detail": "小花瓶"
+    }
+   ]
+  }
+ ],
+ "actions": [
+  {
+   "id": "choose_first",
+   "label": "选首选",
+   "kind": "tool_call",
+   "tool": "recommend_products",
+   "args": {
+    "product_id": "tp-mug-300"
+   },
+   "confirm": false,
+   "destructive": false
+  },
+  {
+   "id": "choose_alternative",
+   "label": "选备选",
+   "kind": "tool_call",
+   "tool": "recommend_products",
+   "args": {
+    "product_id": "tp-plate-20"
+   },
+   "confirm": false,
+   "destructive": false
+  },
+  {
+   "id": "view_product",
+   "label": "查看商品",
+   "kind": "link",
+   "url": "https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/api/products.json#tp-mug-300",
+   "confirm": false,
+   "destructive": false
+  }
+ ],
+ "totals": {
+  "example": {
+   "product_id": "tp-mug-300",
+   "quantity": 1,
+   "lines": [
+    {
+     "label": "商品",
+     "amount": 128,
+     "currency": "CNY"
+    },
+    {
+     "label": "运费",
+     "amount": 12,
+     "currency": "CNY"
+    }
+   ],
+   "total": {
+    "amount": 140,
+    "currency": "CNY"
+   },
+   "verbatim": "128 元 + 12 元运费 = 140 元"
+  },
+  "free_shipping_threshold_cny": 200,
+  "flat_shipping_cny": 12
+ },
+ "policies": [
+  {
+   "label": "运费",
+   "text": "固定 12 元，满 200 元免邮。"
+  },
+  {
+   "label": "退货",
+   "text": "7 天，未使用，退货运费买家付。"
+  },
+  {
+   "label": "支付",
+   "text": "线下支付：确认后卖家提供收款方式，买家在 Agent 外付款，提交交易单号，卖家核验后发货。不要在聊天里发银行卡号、验证码。"
+  }
+ ],
+ "guide": "https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/guide.md",
+ "markdown_fallback": "## Terra Pots Ceramics（Terra Pots Ceramics）\n\n先问用途再推荐：日常用选马克杯，吃饭待客选餐盘配杯成套，装饰送礼选小花瓶。\n\n| 商品 | 价格 | 库存 |\n|---|---|---|\n| [陶土马克杯 300ml](https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/api/products.json#tp-mug-300) | 128 元 | 有货（15） |\n| [陶土餐盘 20cm](https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/api/products.json#tp-plate-20) | 98 元 | 有货（22） |\n| [小花瓶](https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/api/products.json#tp-vase-s) | 158 元 | 有货（8） |\n\n主要用来做什么？\n\n1. 日常喝水、喝茶 — 300ml 马克杯\n2. 吃饭、待客 — 20cm 餐盘，配杯成套\n3. 装饰、送礼 — 小花瓶\n\n请回复编号选择。\n\n举例：陶土马克杯 300ml 1 件，128 元 + 12 元运费 = 140 元。运费 12 元，满 200 元免邮；退货 7 天，未使用，退货运费买家付。确认后按卖家给的线下支付方式付款，付完把交易单号发给 Agent，卖家核验后发货。\n",
+ "provenance": {
+  "shop_id": "terra-pots",
+  "shop_name": "Terra Pots Ceramics",
+  "fetched_at": "2026-11-10",
+  "ttl_seconds": 300
+ },
+ "presentation": {
+  "adapters": {
+   "muse": {
+    "rendering": "Clickable tap-to-reply options, list / shopping cards, map, agenda, HTML widget. Agent picks from the IR; options are short labels, 2-4 per question.",
+    "actions": "Options send the label as the user's reply; product rows are links."
+   },
+   "claude": {
+    "rendering": "MCP Apps (io.modelcontextprotocol/ui, text/html;profile=mcp-app, sandboxed iframe, platform-owned template, Allow/Always-allow prompt). Text fallback is mandatory — tools MUST return meaningful text content even when UI is available.",
+    "elicitation": "Form mode for one blocking choice/confirm (flat JSON Schema, enums); URL mode for payment/sign-in only. Claude Code supports form+URL; claude.ai web elicitation support is unverified — do not depend on it there.",
+    "artifacts": "Model-decided only. No tool or MCP server can request an Artifact."
+   },
+   "grok": {
+    "rendering": "Markdown/text only. No documented rich-UI convention for third parties. No MCP Apps rendering, no elicitation, no Artifact/Studio request. Use the Markdown fallback below."
+   },
+   "generic": {
+    "rendering": "Markdown/text only (same as Grok). Default when client capabilities are unknown."
+   }
+  },
+  "client_detection": "From MCP initialize capabilities: extensions['io.modelcontextprotocol/ui'] + mimeTypes containing 'text/html;profile=mcp-app' => MCP Apps capable; capabilities.elicitation form/url => elicitation capable; otherwise Markdown fallback. Never sniff User-Agent or model name.",
+  "fallback_rules": [
+   "Text is the contract, UI is progressive enhancement. Every tool returns Markdown text + structuredContent (this IR).",
+   "One question per turn in text. Never present two option groups at once.",
+   "Numbered options, not buttons: '1. 手冲 — 喜欢花果香、清爽' and 'Reply with the number'.",
+   "Links, not embedded actions: product and checkout are plain Markdown links.",
+   "Totals verbatim, once: print the authoritative total; do not recompute or reformat it.",
+   "Confirm before money moves. Payment is offline: the seller provides payment instructions, the buyer pays outside the agent, then submits the transaction id. Never send card numbers or verification codes in chat.",
+   "Degrade the catalogue, not the truth: text shows at most 5 products; never truncate a price, stock status, or total."
+  ],
+  "do_not": [
+   "Do not ship HTML/CSS/JS from a shop. MCP Apps HTML is the platform's sandboxed template, fed by structuredContent — never merchant markup.",
+   "Do not assume buttons, cards, or quick-replies exist. They exist only inside an MCP App iframe (Claude/ChatGPT) or as Muse options; everywhere else they are numbered text options.",
+   "Do not request a Claude Artifact or a Grok Studio canvas. No API exists; the model decides. Do not use the leaked <xaiArtifact> tag.",
+   "Do not use elicitation for sensitive data, payment credentials, or a catalogue/cart (flat schema only). Payment goes via URL-mode elicitation (Claude) or a plain checkout link (Grok).",
+   "Do not emit Adaptive Cards, Slack Block Kit, or Telegram keyboards to Claude or Grok — neither consumes them.",
+   "Do not put a fact only in the widget, only in an image, or only in a link destination. Price, stock, total, and policy are in the IR text too."
+  ],
+  "caps": {
+   "products_max": 5,
+   "options_per_turn": 1,
+   "choices_max": 6,
+   "actions_max": 3
+  }
+ },
+ "location": {
+  "city": "江西·景德镇",
+  "name": "Terra Pots Ceramics 陶土手作工作室",
+  "latitude": 29.27,
+  "longitude": 117.2,
+  "address": "江西省景德镇市珠山区",
+  "pickup": "支持到店自提，需提前一天预约。"
+ },
+ "order_timeline": [
+  {
+   "title": "确认订单",
+   "time": "现在",
+   "detail": "商品、数量、总价确认"
+  },
+  {
+   "title": "线下付款",
+   "time": "确认后",
+   "detail": "按卖家给的方式付款"
+  },
+  {
+   "title": "提交付款凭据",
+   "time": "付款后",
+   "detail": "发交易单号给 Agent"
+  },
+  {
+   "title": "卖家核验",
+   "time": "24 小时内",
+   "detail": "核对到账后发货"
+  },
+  {
+   "title": "发货",
+   "time": "2 个工作日内",
+   "detail": "运费 12 元，满 200 免邮"
+  },
+  {
+   "title": "签收",
+   "time": "物流送达",
+   "detail": "7 天内可退，退货运费买家付"
+  }
+ ],
+ "payment": "https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/api/payment.json",
+ "muse_formats": {
+  "options": {
+   "when": "Asking a question or confirming an order",
+   "example": [
+    "手冲",
+    "冷萃",
+    "意式"
+   ]
+  },
+  "list": {
+   "when": "Listing products to choose from",
+   "rows": "one row per product: name, price, stock; tapping a row selects it (send_message)"
+  },
+  "shopping_cards": {
+   "when": "Recommending products",
+   "fields": [
+    "name",
+    "price",
+    "stock",
+    "product_url"
+   ],
+   "image": "image_url is a CC-licensed illustrative photo with image_credit; show the credit, and label it as an illustration, not the actual product photo."
+  },
+  "map": {
+   "when": "User asks where the shop is or about pickup",
+   "location": {
+    "city": "江西·景德镇",
+    "name": "Terra Pots Ceramics 陶土手作工作室",
+    "latitude": 29.27,
+    "longitude": 117.2,
+    "address": "江西省景德镇市珠山区",
+    "pickup": "支持到店自提，需提前一天预约。"
+   }
+  },
+  "agenda": {
+   "when": "Explaining what happens after ordering",
+   "items": [
+    {
+     "title": "确认订单",
+     "time": "现在",
+     "detail": "商品、数量、总价确认"
+    },
+    {
+     "title": "线下付款",
+     "time": "确认后",
+     "detail": "按卖家给的方式付款"
+    },
+    {
+     "title": "提交付款凭据",
+     "time": "付款后",
+     "detail": "发交易单号给 Agent"
+    },
+    {
+     "title": "卖家核验",
+     "time": "24 小时内",
+     "detail": "核对到账后发货"
+    },
+    {
+     "title": "发货",
+     "time": "2 个工作日内",
+     "detail": "运费 12 元，满 200 免邮"
+    },
+    {
+     "title": "签收",
+     "time": "物流送达",
+     "detail": "7 天内可退，退货运费买家付"
+    }
+   ]
+  },
+  "letter": {
+   "when": "After the order is confirmed",
+   "contents": [
+    "products",
+    "quantity",
+    "total",
+    "payment method",
+    "verification and shipping steps"
+   ]
+  },
+  "html_widget": {
+   "when": "Comparing two or more products or working out a total",
+   "contents": "comparison table + total calculator, built only from IR data"
+  },
+  "fallback": "Plain Markdown table with numbered options, same facts as the IR."
+ }
+}

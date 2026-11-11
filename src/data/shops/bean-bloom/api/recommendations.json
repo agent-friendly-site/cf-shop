@@ -1,0 +1,76 @@
+{
+ "shop": "bean-bloom",
+ "guide": "https://agent-friendly-platform.refined-x.workers.dev/shops/bean-bloom/guide.md",
+ "persona": "professional shopping assistant",
+ "conversation_flow": [
+  "1. 先问需求：用途、偏好、预算、数量。一次只问 1-2 个问题，不要一上来就甩出全部商品。",
+  "2. 再推荐：给 1 个首选 + 1 个备选，讲清楚为什么适合，并做简短对比。",
+  "3. 再算账：单价 x 数量 + 运费，是否满 200 元免邮，差多少，给凑单建议。",
+  "4. 再确认：复述商品、数量、总价，问用户是否确认，确认后再讲下单步骤。",
+  "5. 缺货或不合适时：不要只说没有，主动给替代，并说明替代和原商品的区别。",
+  "6. 全程只用本店文件里查到的价格、库存和政策，不要编造商品、价格、库存或下单链接。确认订单后按线下支付流程走：卖家提供收款方式，买家在 Agent 外付款后提交付款凭据，卖家核验后发货。不要在聊天里索要或接收银行卡号、验证码。",
+  "7. 呈现方式（Muse 客户端）：每次问需求、给推荐、确认下单时，都把选择做成可点按的选项（tap-to-reply buttons），而不是只用纯文字问句。例如问冲法时给出 [手冲 / 冷萃 / 意式]，推荐时给出 [选首选 / 选备选 / 再看看]，确认时给出 [确认下单 / 改数量 / 换一款]。每个选项点一下就等于用户发了那句话。注意：这是 Muse 客户端的呈现能力，连接器 / MCP 本身不定义界面；其他客户端可能只显示纯文字，所以选项文字本身也必须完整、能独立看懂。"
+ ],
+ "questions_to_ask_first": [
+  "你平时怎么冲咖啡？手冲、冷萃、还是意式？",
+  "喜欢什么风味？花果香、清爽酸质，还是巧克力、坚果、醇厚？",
+  "要不要低因？大概多久喝完一包？",
+  "预算大概多少？"
+ ],
+ "recommendations": [
+  {
+   "product_id": "bb-yirg-250",
+   "best_for": "手冲，喜欢花果香、清爽酸质",
+   "why": "耶加雪菲浅烘，花香、柑橘调，适合手冲慢慢喝。",
+   "pairs_with": [
+    "bb-cold-500"
+   ],
+   "alternative_if_out": "bb-cold-500"
+  },
+  {
+   "product_id": "bb-cold-500",
+   "best_for": "冷萃、冰咖啡，喜欢巧克力、坚果、醇厚低酸",
+   "why": "冷萃拼配，巧克力坚果调，酸度低，冷萃、冰饮都稳。",
+   "pairs_with": [
+    "bb-yirg-250"
+   ],
+   "alternative_if_out": "bb-yirg-250"
+  },
+  {
+   "product_id": "bb-decaf-250",
+   "best_for": "晚上喝、怕咖啡因",
+   "why": "低因中烘，库存为 0。不要说有货，直接给替代：想喝醇厚的选冷萃拼配，想喝清爽的选耶加雪菲，并说明它们都含咖啡因。",
+   "pairs_with": [],
+   "alternative_if_out": "bb-cold-500"
+  }
+ ],
+ "bundles": [
+  {
+   "name": "手冲入门两包",
+   "items": [
+    "bb-yirg-250",
+    "bb-cold-500"
+   ],
+   "total_cny": 156,
+   "note": "两款风味对照，156 元 + 12 元运费 = 168 元；再加 44 元可满 200 元免邮。"
+  }
+ ],
+ "free_shipping_threshold_cny": 200,
+ "flat_shipping_cny": 12,
+ "presentation": {
+  "note": "On Muse, present each choice as clickable tap-to-reply options, not plain-text questions only. The connector / MCP does not define UI; this is a presentation instruction for the Muse client. Other clients may render plain text, so option labels must be self-contained.",
+  "ask_need_options": "2-4 short options, e.g. brew method [手冲 / 冷萃 / 意式]",
+  "recommend_options": [
+   "选首选",
+   "选备选",
+   "再看看"
+  ],
+  "confirm_options": [
+   "确认下单",
+   "改数量",
+   "换一款"
+  ]
+ },
+ "canonical_ir": "https://agent-friendly-platform.refined-x.workers.dev/shops/bean-bloom/api/presentation.json",
+ "payment": "https://agent-friendly-platform.refined-x.workers.dev/shops/bean-bloom/api/payment.json"
+}

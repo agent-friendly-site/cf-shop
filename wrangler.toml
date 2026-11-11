@@ -1,0 +1,13 @@
+# agent-friendly-platform — Cloudflare Workers + D1.
+# Deployment is via the Cloudflare API helper (cf.py worker-put), NOT
+# `wrangler deploy`, because wrangler cannot use the vault-stored API token.
+# This file documents the bindings and drives local dev (`npx wrangler dev`).
+name = "agent-friendly-platform"
+main = "dist/worker.mjs"
+compatibility_date = "2025-06-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "agent-friendly-orders"
+database_id = "dd3c36b4-a260-4fc5-9da2-b9b06ccfb1cc"
+migrations_dir = "migrations"

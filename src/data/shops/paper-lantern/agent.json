@@ -1,0 +1,86 @@
+{
+ "@type": "AgentCard",
+ "name": "Paper Lantern Stationery",
+ "name_zh": "纸灯文具",
+ "url": "https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/",
+ "description": "Notebooks and pens for people who still write by hand.",
+ "category": "stationery",
+ "currency": "CNY",
+ "agent_only": true,
+ "human_browsing": false,
+ "entry_points": {
+  "llms_txt": "https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/llms.txt",
+  "llms_full_txt": "https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/llms-full.txt",
+  "openapi": "https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/openapi.json",
+  "agent_card": "https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/agent.json",
+  "catalog": "https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/api/catalog.json",
+  "products": "https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/api/products.json",
+  "policies": "https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/policies.json",
+  "mcp": "https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/mcp",
+  "guide": "https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/guide.md",
+  "recommendations": "https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/api/recommendations.json",
+  "presentation": "https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/api/presentation.json",
+  "starter_prompt": "https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/starter-prompt.txt",
+  "payment": "https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/api/payment.json",
+  "location": "https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/api/presentation.json"
+ },
+ "mcp": {
+  "endpoint": "https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/mcp",
+  "transport": "Streamable HTTP",
+  "protocol_versions": [
+   "2025-06-18",
+   "2025-03-26"
+  ],
+  "tools": [
+   "list_products",
+   "get_product",
+   "recommend_products",
+   "calculate_total",
+   "create_order",
+   "submit_payment_proof",
+   "get_order"
+  ],
+  "status": "live"
+ },
+ "discovery": [
+  "GET {shop}/",
+  "GET {shop}/llms.txt",
+  "GET {shop}/openapi.json",
+  "GET {shop}/agent.json",
+  "POST https://agent-friendly-platform.refined-x.workers.dev/shops/{shop}/mcp tools/list"
+ ],
+ "persona": "professional shopping assistant",
+ "guide": "https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/guide.md",
+ "recommendations": "https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/api/recommendations.json",
+ "conversation_flow": [
+  "1. 先问需求：用途、偏好、预算、数量。一次只问 1-2 个问题，不要一上来就甩出全部商品。",
+  "2. 再推荐：给 1 个首选 + 1 个备选，讲清楚为什么适合，并做简短对比。",
+  "3. 再算账：单价 x 数量 + 运费，是否满 200 元免邮，差多少，给凑单建议。",
+  "4. 再确认：复述商品、数量、总价，问用户是否确认，确认后再讲下单步骤。",
+  "5. 缺货或不合适时：不要只说没有，主动给替代，并说明替代和原商品的区别。",
+  "6. 全程只用本店文件里查到的价格、库存和政策，不要编造商品、价格、库存或下单链接。确认订单后按线下支付流程走：卖家提供收款方式，买家在 Agent 外付款后提交付款凭据，卖家核验后发货。不要在聊天里索要或接收银行卡号、验证码。",
+  "7. 呈现方式（Muse 客户端）：每次问需求、给推荐、确认下单时，都把选择做成可点按的选项（tap-to-reply buttons），而不是只用纯文字问句。例如问冲法时给出 [手冲 / 冷萃 / 意式]，推荐时给出 [选首选 / 选备选 / 再看看]，确认时给出 [确认下单 / 改数量 / 换一款]。每个选项点一下就等于用户发了那句话。注意：这是 Muse 客户端的呈现能力，连接器 / MCP 本身不定义界面；其他客户端可能只显示纯文字，所以选项文字本身也必须完整、能独立看懂。"
+ ],
+ "presentation": {
+  "canonical_ir": "https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/api/presentation.json",
+  "adapters": {
+   "muse": {
+    "rendering": "Clickable tap-to-reply options, list / shopping cards, map, agenda, HTML widget. Agent picks from the IR; options are short labels, 2-4 per question.",
+    "actions": "Options send the label as the user's reply; product rows are links."
+   },
+   "claude": {
+    "rendering": "MCP Apps (io.modelcontextprotocol/ui, text/html;profile=mcp-app, sandboxed iframe, platform-owned template, Allow/Always-allow prompt). Text fallback is mandatory — tools MUST return meaningful text content even when UI is available.",
+    "elicitation": "Form mode for one blocking choice/confirm (flat JSON Schema, enums); URL mode for payment/sign-in only. Claude Code supports form+URL; claude.ai web elicitation support is unverified — do not depend on it there.",
+    "artifacts": "Model-decided only. No tool or MCP server can request an Artifact."
+   },
+   "grok": {
+    "rendering": "Markdown/text only. No documented rich-UI convention for third parties. No MCP Apps rendering, no elicitation, no Artifact/Studio request. Use the Markdown fallback below."
+   },
+   "generic": {
+    "rendering": "Markdown/text only (same as Grok). Default when client capabilities are unknown."
+   }
+  },
+  "fallback": "markdown",
+  "client_detection": "From MCP initialize capabilities: extensions['io.modelcontextprotocol/ui'] + mimeTypes containing 'text/html;profile=mcp-app' => MCP Apps capable; capabilities.elicitation form/url => elicitation capable; otherwise Markdown fallback. Never sniff User-Agent or model name."
+ }
+}

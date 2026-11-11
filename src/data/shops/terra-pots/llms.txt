@@ -1,0 +1,41 @@
+## Presentation — render from api/presentation.json
+
+This shop ships data only, never HTML/CSS. Render from [api/presentation.json](https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/api/presentation.json) — the canonical IR. Markdown text is the contract; rich UI is progressive enhancement.
+
+- At most 5 products, as a Markdown table: 商品 | 价格 | 库存. Prices are {amount, currency}; print the total verbatim, do not recompute it.
+- One question per turn. In text, use numbered options ('1. 手冲 — 喜欢花果香、清爽', '请回复编号选择'). On Muse, the same options may be clickable buttons; on Claude, an MCP App may render them; on Grok, text only.
+- Product and checkout are plain Markdown links, not embedded actions. Actions in the IR are semantic (tool/args), at most 3.
+- Never request a Claude Artifact or Grok Studio canvas, never use <xaiArtifact>, never use elicitation for sensitive/payment data or a catalogue.
+
+## Shopping guide — read this before recommending
+
+Act as a professional shopping assistant, not a catalog lookup. First read guide.md and api/recommendations.json, then ask 1-2 questions about use, preference, budget and quantity before recommending. Recommend 1 first choice + 1 alternative with reasons, show the maths (price x quantity + shipping), check free shipping over 200 CNY, and confirm before talking about an order. If a product is out of stock, offer an alternative instead of stopping. Links: [guide.md](https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/guide.md), [recommendations](https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/api/recommendations.json).
+
+# Terra Pots Ceramics (陶土手作)
+
+> Hand-thrown stoneware mugs and plates, made in Jingdezhen.
+> Agent-only shop. Orders are placed through an agent; payment is offline.
+> Shop URL: https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/
+
+## Entry points
+- [Agent card](https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/agent.json)
+- [Agent card (well-known)](https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/.well-known/agent.json)
+- [OpenAPI](https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/openapi.json)
+- [Full corpus](https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/llms-full.txt)
+- [Catalog](https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/api/catalog.json)
+- [Products](https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/api/products.json)
+- [Policies](https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/policies.json)
+- [Payment (offline)](https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/api/payment.json)
+- [MCP descriptor](https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/mcp.json)
+- [Consumer starter prompt](https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/starter-prompt.txt)
+
+## What this shop sells
+- Stoneware Mug 300ml — 128 CNY, stock 15. Hand-thrown, glazed interior, dishwasher safe.
+- Dinner Plate 20cm — 98 CNY, stock 22. Speckled glaze, each piece slightly different.
+- Small Bud Vase — 158 CNY, stock 8. Hand-thrown, holds a single stem.
+
+## How to interact
+- Read-only first: GET {shop}/api/products.json, then GET {shop}/policies.json.
+- Live MCP endpoint: POST https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/mcp, Streamable HTTP, protocol 2025-06-18. Tools: list_products, get_product, recommend_products, calculate_total, create_order, submit_payment_proof, get_order. See mcp.json.
+- The shop catalog is served from D1 on this Worker; the MCP endpoint above is the live server.
+- create_order: send an idempotency_key. The order starts as pending_payment; the seller provides offline payment instructions in the order confirmation.

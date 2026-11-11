@@ -1,0 +1,70 @@
+{
+ "shop": "paper-lantern",
+ "payment": {
+  "online": false,
+  "method": "offline",
+  "summary": "线下支付：确认订单后卖家提供收款方式，买家在 Agent 外付款，付款后提交付款凭据，卖家核验到账后发货。",
+  "methods": [
+   {
+    "id": "bank_transfer",
+    "label": "银行转账",
+    "instructions": "确认订单后，卖家提供收款银行、户名和账号；转账时请备注订单号。"
+   },
+   {
+    "id": "wechat_pay",
+    "label": "微信支付",
+    "instructions": "确认订单后，卖家提供微信收款账号；付款后请保存付款截图和交易单号。"
+   },
+   {
+    "id": "alipay",
+    "label": "支付宝",
+    "instructions": "确认订单后，卖家提供支付宝账号；付款时请备注订单号。"
+   }
+  ],
+  "never_in_chat": [
+   "银行卡号",
+   "验证码",
+   "支付密码"
+  ],
+  "flow": [
+   {
+    "step": 1,
+    "title": "确认订单",
+    "detail": "Agent 与买家确认商品、数量、总价。"
+   },
+   {
+    "step": 2,
+    "title": "卖家提供收款方式",
+    "detail": "订单确认后，卖家在订单里给出线下收款方式（银行转账 / 微信支付 / 支付宝）。"
+   },
+   {
+    "step": 3,
+    "title": "买家线下付款",
+    "detail": "买家离开 Agent，在自己的支付应用里付款。"
+   },
+   {
+    "step": 4,
+    "title": "提交付款凭据",
+    "detail": "买家把交易单号发给 Agent（可用 submit_payment_proof 工具），也可附付款截图说明。"
+   },
+   {
+    "step": 5,
+    "title": "卖家核验",
+    "detail": "卖家在 24 小时内核对到账；金额不符或查不到时联系买家核对。"
+   },
+   {
+    "step": 6,
+    "title": "发货与交付",
+    "detail": "核验通过后 2 个工作日内发货；签收后 7 天内可退，退货运费买家付。"
+   }
+  ],
+  "order_statuses": [
+   "pending_payment",
+   "payment_submitted",
+   "paid",
+   "shipped",
+   "delivered",
+   "returned"
+  ]
+ }
+}
