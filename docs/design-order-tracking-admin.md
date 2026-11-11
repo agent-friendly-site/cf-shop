@@ -1,6 +1,6 @@
 # 订单自动跟进 + 卖家后台 设计方案
 
-日期：2026-11-11 · 状态：**已实施（v1.2.0，commit 待填）**，2026-11-11 线上验证通过
+日期：2026-11-11 · 状态：**已实施（v1.2.0，commit 27d1512f）**，2026-11-11 线上验证通过
 对应代码库：`agent-friendly-site/cf-shop`（Worker `agent-friendly-platform`，D1 `agent-friendly-orders`）
 当前版本：openapi 1.1.0，8 个 MCP 工具，订单状态只有 `pending_payment / payment_submitted / paid`
 

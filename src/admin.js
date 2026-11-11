@@ -247,6 +247,7 @@ function escapeHtml(s) {
 const ADMIN_HTML = `<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
 <title>卖家后台 — __SHOP_NAME__</title>
 <style>
 body{font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;max-width:960px;margin:0 auto;padding:24px;color:#222}
@@ -320,11 +321,11 @@ async function loadOrders(){
     document.getElementById("counts").innerHTML = Object.keys(STATUS_LABEL).map(function(s){
       return '<span class="pill">' + STATUS_LABEL[s] + "：" + (c[s]||0) + "</span>";
     }).join("") + '<span class="pill">共 ' + c.total + " 单</span>";
-    document.getElementById("filters").innerHTML = '<button onclick="setFilter(\'\')">全部</button>' +
-      Object.keys(STATUS_LABEL).map(function(s){ return '<button onclick="setFilter(\''+s+'\')">' + STATUS_LABEL[s] + "</button>"; }).join("");
+    document.getElementById("filters").innerHTML = '<button data-filter="">全部</button>' +
+      Object.keys(STATUS_LABEL).map(function(s){ return '<button data-filter="' + s + '">' + STATUS_LABEL[s] + "</button>"; }).join("");
     var rows = d.orders.map(function(o){
       var items = o.items.map(function(i){ return esc(i.name) + " ×" + i.quantity + "（" + i.line_total + " 元）"; }).join("；");
-      return "<tr><td>" + esc(o.id) + "</td><td>" + esc(o.buyer_name||"—") + "<br><span class='muted'>" + esc(o.buyer_contact||"") + "</span></td><td>" + items + "</td><td>" + o.total_cny + " 元</td><td>" + STATUS_LABEL[o.status] + "</td><td>" + esc(o.created_at.slice(0,19).replace("T"," ")) + "</td><td><button onclick='showOrder(\"" + o.id + "\")'>详情</button></td></tr>";
+      return "<tr><td>" + esc(o.id) + "</td><td>" + esc(o.buyer_name||"—") + "<br><span class='muted'>" + esc(o.buyer_contact||"") + "</span></td><td>" + items + "</td><td>" + o.total_cny + " 元</td><td>" + STATUS_LABEL[o.status] + "</td><td>" + esc(o.created_at.slice(0,19).replace("T"," ")) + "</td><td><button data-order='" + o.id + "'>详情</button></td></tr>";
     }).join("");
     document.getElementById("orders").innerHTML = "<h2>订单</h2><table><tr><th>订单号</th><th>买家</th><th>商品</th><th>总价</th><th>状态</th><th>下单时间</th><th></th></tr>" + rows + "</table>";
   } catch(e){ document.getElementById("orders").innerHTML = "<p class='bad'>" + esc(e.message) + "</p>"; }
@@ -347,13 +348,13 @@ async function showOrder(id){
     + "<p>物流：" + esc(o.carrier||"—") + " " + esc(o.tracking_number||"") + "</p>"
     + "<p>时间线：</p><ul>" + tl + "</ul>";
   if (o.status === "payment_submitted") {
-    html += "<p>确认收款金额：<input id='vamt' type='number' value='" + o.total_cny + "'> 元 <button onclick='confirmPay(\"" + o.id + "\")'>确认收款</button></p>";
+    html += "<p>确认收款金额：<input id='vamt' type='number' value='" + o.total_cny + "'> 元 <button data-action='confirm-pay' data-id='" + o.id + "'>确认收款</button></p>";
   }
   if (o.status === "paid") {
-    html += "<p>快递公司：<input id='carrier' placeholder='如 顺丰'> 单号：<input id='tnum' placeholder='快递单号（可空）'> <button onclick='ship(\"" + o.id + "\")'>标记发货</button></p>";
+    html += "<p>快递公司：<input id='carrier' placeholder='如 顺丰'> 单号：<input id='tnum' placeholder='快递单号（可空）'> <button data-action='ship' data-id='" + o.id + "'>标记发货</button></p>";
   }
   if (o.status === "pending_payment" || o.status === "payment_submitted") {
-    html += "<p><button onclick='cancelOrder(\"" + o.id + "\")'>取消订单</button></p>";
+    html += "<p><button data-action='cancel-order' data-id='" + o.id + "'>取消订单</button></p>";
   }
   html += "<p id='actErr' class='bad'></p></div>";
   document.getElementById("detail").innerHTML = html;
@@ -378,7 +379,7 @@ async function cancelOrder(id){
 async function loadProducts(){
   var d = await api("/products");
   var rows = d.products.map(function(p){
-    return "<tr><td>" + esc(p.name_zh||p.name) + "<br><span class='muted'>" + esc(p.id) + "</span></td><td><input id='price-" + p.id + "' type='number' value='" + p.price + "' style='width:80px'> 元</td><td><input id='stock-" + p.id + "' type='number' value='" + p.stock + "' style='width:70px'> 件</td><td><button onclick='saveProduct(\"" + p.id + "\")'>保存</button></td></tr>";
+    return "<tr><td>" + esc(p.name_zh||p.name) + "<br><span class='muted'>" + esc(p.id) + "</span></td><td><input id='price-" + p.id + "' type='number' value='" + p.price + "' style='width:80px'> 元</td><td><input id='stock-" + p.id + "' type='number' value='" + p.stock + "' style='width:70px'> 件</td><td><button data-action='save-product' data-id='" + p.id + "'>保存</button></td></tr>";
   }).join("");
   document.getElementById("products").innerHTML = "<h2>商品管理</h2><p class='muted'>改价格或库存后，店铺的商品列表会立即更新。库存改成 0 即为无货。</p><table><tr><th>商品</th><th>价格</th><th>库存</th><th></th></tr>" + rows + "</table>";
 }
@@ -396,7 +397,7 @@ async function loadPolicies(){
     + "<p>运费：<input id='ship' type='number' value='" + p.shipping_flat_cny + "'> 元 · 满 <input id='freeover' type='number' value='" + p.free_over_cny + "'> 元免邮 · 发货时效：<input id='lead' value='" + esc(p.lead_time) + "'></p>"
     + "<p>退货天数：<input id='rwin' type='number' value='" + p.returns_window_days + "'> 天 · 退货条件：<input id='rcond' value='" + esc(p.returns_condition||"") + "'> · 退货运费：<input id='rship' value='" + esc(p.return_shipping||"") + "'></p>"
     + "<h3>收款方式说明</h3>" + methods
-    + "<p><button onclick='savePolicies()'>保存政策</button></p><p id='polErr' class='bad'></p>";
+    + "<p><button data-action='save-policies'>保存政策</button></p><p id='polErr' class='bad'></p>";
 }
 async function savePolicies(){
   var patch = {shipping_flat_cny: Number(document.getElementById("ship").value), free_over_cny: Number(document.getElementById("freeover").value), lead_time: document.getElementById("lead").value, returns_window_days: Number(document.getElementById("rwin").value), returns_condition: document.getElementById("rcond").value, return_shipping: document.getElementById("rship").value};
@@ -404,5 +405,20 @@ async function savePolicies(){
   try { await api("/policies", {method:"PUT", body: JSON.stringify(patch)}); alert("已保存"); }
   catch(e){ document.getElementById("polErr").textContent = e.message; }
 }
+// 动态生成的按钮不用 inline onclick（模板字符串里转义会丢，整段 script 会解析失败，
+// 之前 doLogin is not defined 就是这么来的），改用 data- 属性 + 事件委托。
+document.addEventListener("click", function(e){
+  var b = e.target.closest("button[data-action],button[data-filter],button[data-order]");
+  if (!b) return;
+  if (b.hasAttribute("data-filter")) { setFilter(b.getAttribute("data-filter")); return; }
+  if (b.hasAttribute("data-order")) { showOrder(b.getAttribute("data-order")); return; }
+  var act = b.getAttribute("data-action");
+  var id = b.getAttribute("data-id");
+  if (act === "confirm-pay") confirmPay(id);
+  else if (act === "ship") ship(id);
+  else if (act === "cancel-order") cancelOrder(id);
+  else if (act === "save-product") saveProduct(id);
+  else if (act === "save-policies") savePolicies();
+});
 api("/me").then(function(){ showApp(); loadOrders(); }).catch(function(){});
 </script></body></html>`;
