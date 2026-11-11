@@ -44,7 +44,7 @@ function publicProduct(p) {
 export function createMcpServer(env, shop) {
   const server = new McpServer({
     name: "agent-friendly-platform",
-    version: "1.4.0",
+    version: "1.4.1",
   });
 
   server.registerTool(
@@ -126,7 +126,7 @@ export function createMcpServer(env, shop) {
     {
       title: "Create order",
       description:
-        "Create an order. Requires idempotency_key. Order starts as pending_payment; payment is offline, instructions are returned with the order. Ask the buyer for name, contact and shipping address at the confirmation step and pass them as buyer_name / buyer_contact / shipping_address (all optional, but the seller needs an address to ship). If the buyer only gives their name/contact/address after the order was created, use update_buyer_info to fill it in (allowed until the order ships). After a successful create_order, send the buyer the payment instructions returned with the order (payment method + the seller's configured receiving account, verbatim) and wait for the buyer to pay offline and submit proof. Do NOT start tracking this order yet: tracking starts only after submit_payment_proof succeeds.",
+        "Create an order. Requires idempotency_key. Order starts as pending_payment; payment is offline, instructions are returned with the order. Before calling create_order, you MUST ask the buyer for name, contact and shipping address at the confirmation step and pass them as buyer_name / buyer_contact / shipping_address (all optional, but the seller needs an address to ship). This order is mandatory: ask first, create the order only after you have the info. Do NOT create the order first and ask afterwards. If the buyer refuses to give an address, explain the seller cannot ship without one and only proceed if the buyer explicitly insists on ordering anyway; fill the info in later with update_buyer_info (allowed until the order ships). After a successful create_order, send the buyer the payment instructions returned with the order (payment method + the seller's configured receiving account, verbatim) and wait for the buyer to pay offline and submit proof. Do NOT start tracking this order yet: tracking starts only after submit_payment_proof succeeds.",
       inputSchema: {
         items: z.array(ItemShape),
         idempotency_key: z.string(),

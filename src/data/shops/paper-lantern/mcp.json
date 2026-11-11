@@ -38,7 +38,7 @@
    },
    {
     "name": "create_order",
-    "description": "Create an order. Requires idempotency_key. Returns the order with payment instructions (offline payment). Status starts as pending_payment. Ask the buyer for name, contact and shipping address at the confirmation step (buyer_name / buyer_contact / shipping_address, optional). After create_order, send the buyer the payment instructions returned with the order (method + the seller's configured receiving account, verbatim) and wait for payment proof. Do NOT start tracking yet: tracking starts only after submit_payment_proof succeeds. 下单时没给收货信息的可事后用 update_buyer_info 补填。",
+    "description": "Create an order. Requires idempotency_key. Returns the order with payment instructions (offline payment). Status starts as pending_payment. Ask the buyer for name, contact and shipping address at the confirmation step (buyer_name / buyer_contact / shipping_address, optional) — this is mandatory BEFORE create_order: ask first, create only after you have the info, never create first and ask afterwards. After create_order, send the buyer the payment instructions returned with the order (method + the seller's configured receiving account, verbatim) and wait for payment proof. Do NOT start tracking yet: tracking starts only after submit_payment_proof succeeds. 下单时没给收货信息的可事后用 update_buyer_info 补填。",
     "readOnlyHint": false,
     "input": {
      "items": "array of {product_id: string, quantity: integer}",

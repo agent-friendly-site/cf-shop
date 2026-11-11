@@ -2,7 +2,7 @@
  "openapi": "3.1.0",
  "info": {
   "title": "Bean Bloom Coffee — Agent API",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Small-batch roasted coffee beans, shipped from Yunnan. Agent-first storefront at https://agent-friendly-platform.refined-x.workers.dev/shops/bean-bloom/ Paths in this document are absolute from the host root, e.g. /shops/bean-bloom/llms.txt."
  },
  "servers": [

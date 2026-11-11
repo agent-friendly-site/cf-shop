@@ -247,6 +247,12 @@ frozen once shipped; the change is recorded in the order timeline as
 `buyer_info_updated` so the seller can see it. `guide.md` now tells
 the agent to use it instead of asking the buyer to place a new order.
 
+v1.4.1 (same day, Hall's follow-up): asking for buyer info before
+`create_order` is now a hard rule — ask first, create only after the
+info is given; creating first and asking afterwards is no longer
+allowed (only exception: the buyer explicitly insists after being
+warned the seller cannot ship without an address).
+
 ## Migration notes (from GitHub Pages + agent-friendly-mcp)
 
 - The old deployment was split: static JSON on GitHub Pages

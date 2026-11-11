@@ -136,3 +136,4 @@ GET/PUT /shops/:shop/admin/api/policies
 - 发现：v1.3.0 盲测里 agent 先下单、后问收货信息，而 MCP 没有事后补填的工具，订单的 buyer 字段一直是空的；agent 只能把收货信息记在跟踪任务里提醒买家，卖家发货前还得再确认一次。
 - 新增 `update_buyer_info` 工具：下单后、发货前可补填或修改 buyer_name / buyer_contact / shipping_address，至少填一项，只改给出的字段；已发货 / 已完成 / 已取消的订单不允许改。改动记一条 `buyer_info_updated` 事件进 timeline（from/to 都是当前状态），卖家在订单详情里能看到。
 - guide.md 明确写了：买家事后补给收货信息时用这个工具，不要让买家重新下单；补填后用 get_order 核对。
+- v1.4.1 硬性规则（Hall 追加，2026-11-11）：下单前必须先问清收货信息。顺序是硬性的——先问、问清了再调 `create_order`，绝不能先下单、后补问；只有买家明确坚持不给（且已说明没有地址卖家没法发货）时才例外，之后用 `update_buyer_info` 补填。`guide.md` 流程 4（确认）和流程 7（下单前问收货信息）、`create_order` 的工具描述、`mcp.json` / `agent.json` 都改成了硬性表述。
