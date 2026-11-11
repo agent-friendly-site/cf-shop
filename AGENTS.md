@@ -23,7 +23,7 @@ npm run build        # esbuild 打包到 dist/worker.mjs
 npm run dev          # wrangler dev 本地开发
 npm test             # 本地 Vitest（workers-pool / vitest-plugin + D1）
 npm run test:e2e     # 线上 E2E（Python + curl 打线上 Worker）
-npm run seed         # 从 src/data 同步商品/政策到 D1（要账号和库 ID 参数）
+npm run seed -- --local  # 从 src/data 同步到本地 D1（--remote 写生产）
 ```
 
 部署：Phase 0 已验证，走 `npx wrangler deploy`（见“部署”一节）；cf.py 仅兜底。
@@ -120,8 +120,8 @@ tsconfig.json      TypeScript strict
 
 - v1.7.0 已上线：15 分钟未付款自动取消、上传链接交截图、卖家核验、
   跟踪 + 后台管理。全部功能见 `README.md` 的版本记录。
-- 进行中：`docs/refactor-plan.md` 的 v2.0 重构。**Phase 0 + Phase 1 + Phase 2.1–2.3 已完成**
- （wrangler、HonoX spike、TS、Biome、Vitest、Drizzle schema/repos/migrations）。下一步 Phase 2.4 seed.ts。
+- 进行中：`docs/refactor-plan.md` 的 v2.0 重构。**Phase 0–2 已完成**
+ （wrangler、HonoX spike、TS、Biome、Vitest、Drizzle schema/repos/migrations/seed.ts）。下一步 Phase 3 服务层。
   前端已定 HonoX 0.1.62（pin 死）+ React 渲染器 + Tailwind v4 + shadcn/ui；
   只接后台和上传页，API/MCP 不迁文件路由。接手时先读计划，按阶段做，不要跳阶段。
   注：`@cloudflare/vitest-pool-workers` 已更名为 `@cloudflare/vitest-plugin`，Phase 1.5 用后者。

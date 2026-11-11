@@ -142,12 +142,19 @@ npx wrangler d1 migrations apply agent-friendly-orders --local
 npx wrangler dev       # local dev, local D1 from drizzle/
 ```
 
-To seed a local D1, or to re-seed the production D1, use the seed script
-(it imports src/data; for a brand-new local DB apply `drizzle/` first):
+To seed a local D1 (or re-seed production), use the TypeScript seed script
+(Phase 2.4; reads `src/data`, applies via wrangler). For a brand-new local
+DB apply `drizzle/` first:
 
 ```sh
-python3 scripts/seed.py <account-id> <database-id> [--migrate-order /tmp/do_order.json]
+npx wrangler d1 migrations apply agent-friendly-orders --local
+npm run seed -- --local
+npm run seed -- --remote          # re-seed production catalog
+npm run seed -- --dump            # print statements (compare with seed.py --dump)
 ```
+
+The legacy Python seeder remains as `npm run seed:py` / `scripts/seed.py`
+(muse surrogate credentials; still supports `--dump` for parity checks).
 
 Re-import shop data from the GitHub Pages source (rewrites hosts, applies
 the documented text fixes) and regenerate the bundled data module:
