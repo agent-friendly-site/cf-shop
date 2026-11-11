@@ -1,62 +1,26 @@
+import { totals as computeTotals, type OrderTotals } from "../../domain/money";
 import { assertCanTransition, canUpdateBuyerInfo, paymentExpiresAt } from "../../domain/order";
 import {
   AUTO_COMPLETE_AFTER_DAYS,
   DomainRpcError,
-  FREE_SHIPPING_OVER,
   ORDER_STATUSES,
   type Order,
   type OrderEvent,
   type OrderItemInput,
-  type OrderLineItem,
   type OrderRow,
   type OrderStatus,
   type PaymentProof,
   type Product,
   rows,
-  SHIPPING_FLAT,
   UNPAID_EXPIRY_MINUTES,
   writeEvent,
 } from "../shared";
 
-export interface OrderTotals {
-  lines: OrderLineItem[];
-  subtotal_cny: number;
-  shipping_cny: number;
-  total_cny: number;
-  verbatim: string;
-}
+export type { OrderTotals };
 
+/** Re-export domain totals so existing `db.totals` callers stay unchanged. */
 export function totals(items: OrderItemInput[], products: Product[]): OrderTotals {
-  let subtotal = 0;
-  const lines: OrderLineItem[] = [];
-  for (const it of items) {
-    const p = products.find((x) => x.id === it.product_id);
-    if (!p) {
-      throw new DomainRpcError(`unknown product_id: ${it.product_id}`, -32602);
-    }
-    const qty = it.quantity ?? 1;
-    if (!Number.isInteger(qty) || qty < 1) {
-      throw new DomainRpcError(`bad quantity for ${it.product_id}`, -32602);
-    }
-    if (p.stock < qty) {
-      throw new DomainRpcError(`${p.name_zh || p.name} 库存不足（仅剩 ${p.stock} 件）`, -32000);
-    }
-    subtotal += p.price * qty;
-    lines.push({
-      product_id: p.id,
-      name: p.name_zh || p.name,
-      unit_price: p.price,
-      quantity: qty,
-      line_total: p.price * qty,
-    });
-  }
-  const shipping = subtotal >= FREE_SHIPPING_OVER || subtotal === 0 ? 0 : SHIPPING_FLAT;
-  const total = subtotal + shipping;
-  const verbatim =
-    shipping === 0
-      ? `${subtotal} 元，满 200 元免邮，共 ${total} 元`
-      : `${subtotal} 元 + ${shipping} 元运费 = ${total} 元`;
-  return { lines, subtotal_cny: subtotal, shipping_cny: shipping, total_cny: total, verbatim };
+  return computeTotals(items, products);
 }
 
 function orderShape(row: OrderRow, proofs: PaymentProof[], timeline: OrderEvent[]): Order {
