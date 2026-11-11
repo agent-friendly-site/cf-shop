@@ -60,7 +60,8 @@ describe("order status machine", () => {
     } catch (e) {
       const err = e as DomainRpcError;
       expect(err.message).toBe("order ord_x is paid; cannot move to cancelled");
-      expect(err.code).toBe(-32000);
+      expect(err.rpcCode).toBe(-32000);
+      expect(err.code).toBe("domain_error");
     }
   });
 

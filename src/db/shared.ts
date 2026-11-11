@@ -12,7 +12,7 @@ export {
   SHIPPING_FLAT,
   UNPAID_EXPIRY_MINUTES,
 } from "../domain/constants";
-export { DomainRpcError } from "../domain/errors";
+export { DomainError, DomainRpcError, toHttpError, toMcpError } from "../domain/errors";
 
 import type { OrderStatus } from "../domain/constants";
 

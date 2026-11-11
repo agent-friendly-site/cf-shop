@@ -45,7 +45,8 @@ describe("assertCanConfirmPayment", () => {
     } catch (e) {
       const err = e as DomainRpcError;
       expect(err).toBeInstanceOf(DomainRpcError);
-      expect(err.code).toBe(-32000);
+      expect(err.rpcCode).toBe(-32000);
+      expect(err.code).toBe("domain_error");
       expect(err.message).toBe(
         "verified amount 139 CNY does not match order total 140 CNY; order stays payment_submitted",
       );

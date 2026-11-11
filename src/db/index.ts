@@ -51,6 +51,7 @@ export {
 } from "./repositories/proofs";
 export {
   AUTO_COMPLETE_AFTER_DAYS,
+  DomainError,
   DomainRpcError,
   FREE_SHIPPING_OVER,
   ORDER_STATUSES,
@@ -66,5 +67,7 @@ export {
   type Shop,
   type ShopPolicies,
   sha256Hex,
+  toHttpError,
+  toMcpError,
   UNPAID_EXPIRY_MINUTES,
 } from "./shared";

@@ -120,8 +120,8 @@ tsconfig.json      TypeScript strict
 
 - v1.7.0 已上线：15 分钟未付款自动取消、上传链接交截图、卖家核验、
   跟踪 + 后台管理。全部功能见 `README.md` 的版本记录。
-- 进行中：`docs/refactor-plan.md` 的 v2.0 重构。**Phase 0–2 已完成**
- （wrangler、HonoX spike、TS、Biome、Vitest、Drizzle schema/repos/migrations/seed.ts）。下一步 Phase 3 服务层。
+- 进行中：`docs/refactor-plan.md` 的 v2.0 重构。**Phase 0–3 已完成**
+ （地基、Drizzle、domain/services）。下一步 Phase 4 接入层（routes + MCP）。
   前端已定 HonoX 0.1.62（pin 死）+ React 渲染器 + Tailwind v4 + shadcn/ui；
   只接后台和上传页，API/MCP 不迁文件路由。接手时先读计划，按阶段做，不要跳阶段。
   注：`@cloudflare/vitest-pool-workers` 已更名为 `@cloudflare/vitest-plugin`，Phase 1.5 用后者。
