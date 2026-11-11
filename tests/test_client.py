@@ -67,10 +67,18 @@ def main():
     tool("calculate_total", {"items": [{"product_id": "tp-mug-300", "quantity": 1}]})
     key = f"test-{uuid.uuid4().hex[:12]}"
     res = tool("create_order", {"items": [{"product_id": "tp-mug-300", "quantity": 1}],
-                                "idempotency_key": key})
+                                "idempotency_key": key,
+                                "buyer_name": "测试买家", "buyer_contact": "test@example.com",
+                                "shipping_address": "测试省测试市测试路 1 号"})
     order = json.loads(res["result"]["content"][0]["text"])["order"]
     print(f"\nORDER ID: {order['id']}  TOTAL: {order['total_cny']}  STATUS: {order['status']}")
     assert order["status"] == "pending_payment", "expected pending_payment"
+    assert order["buyer_name"] == "测试买家" and order["shipping_address"].endswith("1 号"), "buyer info not stored"
+    assert order["timeline"] and order["timeline"][0]["event"] == "order_created", "expected order_created event"
+    # confirm_receipt on a non-shipped order must fail.
+    res = tool("confirm_receipt", {"order_id": order["id"]})
+    assert res.get("result", {}).get("isError") is True, f"expected confirm_receipt on pending_payment to fail, got: {res}"
+    print("\nCONFIRM_RECEIPT ON PENDING ORDER REJECTED")
     # Submitting a proof must NOT mark the order paid — only payment_submitted.
     res = tool("submit_payment_proof", {"order_id": order["id"], "payment_method": "wechat_pay",
                                         "transaction_id": f"test-txn-{uuid.uuid4().hex[:8]}",
@@ -98,6 +106,36 @@ def main():
     final = json.loads(res["result"]["content"][0]["text"])["order"]
     print(f"\nFINAL STATUS: {final['status']}  PROOFS: {len(final['proofs'])}")
     assert final["status"] == "paid", "expected paid"
+    # Cancelling a paid order must fail.
+    res = tool("cancel_order", {"order_id": order["id"], "reason": "test: cancel paid order"})
+    assert res.get("result", {}).get("isError") is True, f"expected cancel on paid to fail, got: {res}"
+    print("\nCANCEL ON PAID ORDER REJECTED")
+    # Seller marks the order shipped (MCP tool; admin UI shares this logic).
+    res = tool("mark_shipped", {"order_id": order["id"], "carrier": "顺丰", "tracking_number": "SF1234567890"})
+    shipped = json.loads(res["result"]["content"][0]["text"])["order"]
+    print(f"\nAFTER SHIP: {shipped['status']}  CARRIER: {shipped.get('carrier')}  TRACKING: {shipped.get('tracking_number')}")
+    assert shipped["status"] == "shipped", "expected shipped"
+    assert shipped.get("tracking_number") == "SF1234567890", "expected tracking number stored"
+    # Buyer confirms receipt -> completed.
+    res = tool("confirm_receipt", {"order_id": order["id"]})
+    done = json.loads(res["result"]["content"][0]["text"])["order"]
+    print(f"\nAFTER RECEIPT: {done['status']}  COMPLETED_AT: {done.get('completed_at')}")
+    assert done["status"] == "completed", "expected completed"
+    res = tool("get_order", {"order_id": order["id"]})
+    final = json.loads(res["result"]["content"][0]["text"])["order"]
+    events = [e["event"] for e in final["timeline"]]
+    print(f"\nTIMELINE: {events}")
+    assert events == ["order_created", "payment_proof_submitted", "payment_confirmed", "shipped", "receipt_confirmed"], f"unexpected timeline: {events}"
+    assert final["status"] == "completed", "expected completed"
+    # A second order: cancel before paying must work.
+    key2 = f"test-{uuid.uuid4().hex[:12]}"
+    res = tool("create_order", {"items": [{"product_id": "tp-plate-20", "quantity": 1}],
+                                "idempotency_key": key2})
+    order2 = json.loads(res["result"]["content"][0]["text"])["order"]
+    res = tool("cancel_order", {"order_id": order2["id"], "reason": "test: buyer changed mind"})
+    cancelled = json.loads(res["result"]["content"][0]["text"])["order"]
+    print(f"\nCANCELLED ORDER: {cancelled['id']}  STATUS: {cancelled['status']}")
+    assert cancelled["status"] == "cancelled", "expected cancelled"
     print("\nE2E PASS")
 
 

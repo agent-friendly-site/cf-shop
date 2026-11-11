@@ -17,7 +17,7 @@
   "payment_submitted",
   "paid",
   "shipped",
-  "delivered",
-  "returned"
+  "completed",
+  "cancelled"
  ]
 }

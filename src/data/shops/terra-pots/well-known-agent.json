@@ -39,7 +39,10 @@
    "create_order",
    "submit_payment_proof",
    "confirm_payment",
-   "get_order"
+   "get_order",
+   "mark_shipped",
+   "confirm_receipt",
+   "cancel_order"
   ],
   "status": "live"
  },

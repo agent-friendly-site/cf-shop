@@ -12,6 +12,9 @@
 //     policies.json, api/payment.json, api/recommendations.json,
 //     api/presentation.json)
 //   - live MCP: POST /shops/:shop/mcp (Streamable HTTP, protocol 2025-06-18)
+//   - order events: GET /shops/:shop/api/orders/:id/events (public timeline)
+//   - seller admin: /shops/:shop/admin/ (web UI + JSON API, per-shop key)
+//   - daily scheduled job: auto-complete orders shipped 7+ days ago
 //
 // Data: products, policies, payment, recommendations and orders live in D1
 // (see src/db.js). Static prose (llms.txt, guide.md, starter-prompt.txt,
@@ -22,11 +25,12 @@ import { Hono } from "hono";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { createMcpServer } from "./mcp.js";
+import { registerAdminRoutes } from "./admin.js";
 import * as db from "./db.js";
 import { dataFile } from "./data.js";
 
 const BASE = "https://agent-friendly-platform.refined-x.workers.dev";
-const VERSION = "1.1.0";
+const VERSION = "1.2.0";
 
 const app = new Hono();
 
@@ -263,6 +267,20 @@ app.get("/shops/:shop/api/presentation.json", async (c) => {
   });
 });
 
+// --- per-shop order events (public read, order id is the credential) ---
+app.get("/shops/:shop/api/orders/:id/events", async (c) => {
+  const slug = c.req.param("shop");
+  const shop = await shopOr404(c, slug);
+  if (!shop) return notFound(c, `unknown shop: ${slug}`);
+  const order = await db.getOrder(c.env.DB, c.req.param("id"));
+  if (!order || order.shop !== slug) return notFound(c, `unknown order: ${c.req.param("id")}`);
+  const events = await db.listOrderEvents(c.env.DB, order.id);
+  return json(c, { shop: slug, order_id: order.id, status: order.status, events });
+});
+
+// --- seller admin: web UI + JSON API (API-key auth, see src/admin.js) ---
+registerAdminRoutes(app);
+
 // --- live MCP: POST /shops/:shop/mcp ---
 app.all("/shops/:shop/mcp", async (c) => {
   const slug = c.req.param("shop");
@@ -276,4 +294,17 @@ app.all("/shops/:shop/mcp", async (c) => {
 
 app.notFound((c) => notFound(c, `not found: ${c.req.path}`));
 
-export default app;
+// Daily scheduled job (cron trigger, see wrangler.toml): auto-complete
+// orders shipped more than 7 days ago with no buyer confirmation.
+async function scheduledAutoComplete(env) {
+  const done = await db.autoCompleteShipped(env.DB, db.AUTO_COMPLETE_AFTER_DAYS);
+  console.log(`auto-complete: ${done.length} orders completed`, done);
+  return done;
+}
+
+export default {
+  fetch: app.fetch,
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(scheduledAutoComplete(env));
+  },
+};

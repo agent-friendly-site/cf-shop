@@ -5,8 +5,13 @@
 // Payment verification is real seller verification: submit_payment_proof
 // only marks the order payment_submitted; the seller must check the actual
 // receipt and amount and call confirm_payment, which marks it paid.
-// NOTE: confirm_payment currently has no seller authentication in this
-// demo; seller auth comes with the admin work (see README).
+// Order lifecycle: pending_payment -> payment_submitted -> paid ->
+// shipped -> completed (buyer confirm_receipt, or auto-completed 7 days
+// after shipping); cancellable before paid. Every status change is
+// recorded in the order_events timeline returned by get_order.
+// confirm_payment / mark_shipped are seller-side; in this demo the MCP
+// tools have no seller authentication — the seller admin web UI
+// (/shops/:shop/admin/) is the authenticated path (API key per shop).
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import * as db from "./db.js";
@@ -37,7 +42,7 @@ function publicProduct(p) {
 export function createMcpServer(env, shop) {
   const server = new McpServer({
     name: "agent-friendly-platform",
-    version: "1.1.0",
+    version: "1.2.0",
   });
 
   server.registerTool(
@@ -119,14 +124,17 @@ export function createMcpServer(env, shop) {
     {
       title: "Create order",
       description:
-        "Create an order. Requires idempotency_key. Order starts as pending_payment; payment is offline, instructions are returned with the order.",
+        "Create an order. Requires idempotency_key. Order starts as pending_payment; payment is offline, instructions are returned with the order. Ask the buyer for name, contact and shipping address at the confirmation step and pass them as buyer_name / buyer_contact / shipping_address (all optional, but the seller needs an address to ship). After a successful create_order, automatically start tracking this order: check get_order every 6 hours and tell the buyer when the status changes, until it reaches completed or cancelled.",
       inputSchema: {
         items: z.array(ItemShape),
         idempotency_key: z.string(),
         buyer_note: z.string().optional(),
+        buyer_name: z.string().optional(),
+        buyer_contact: z.string().optional(),
+        shipping_address: z.string().optional(),
       },
     },
-    async ({ items, idempotency_key, buyer_note }) => {
+    async ({ items, idempotency_key, buyer_note, buyer_name, buyer_contact, shipping_address }) => {
       const products = await db.listProducts(env.DB, shop);
       const t = db.totals(items || [], products);
       const { order } = await db.createOrder(env.DB, {
@@ -135,6 +143,9 @@ export function createMcpServer(env, shop) {
         total: t,
         idempotencyKey: idempotency_key,
         buyerNote: buyer_note,
+        buyerName: buyer_name,
+        buyerContact: buyer_contact,
+        shippingAddress: shipping_address,
       });
       const payment = await db.getPayment(env.DB, shop);
       return text({
@@ -145,6 +156,8 @@ export function createMcpServer(env, shop) {
         },
         total_verbatim: t.verbatim,
         next_step: "买家按卖家给的线下收款方式付款，然后用 submit_payment_proof 提交交易单号。",
+        tracking:
+          "订单已创建，我会自动帮你跟进：每 6 小时查一次状态，有变化就告诉你，直到订单完成或取消。你不用记订单号，直接问我订单怎么样了就行。",
       });
     }
   );
@@ -210,13 +223,75 @@ export function createMcpServer(env, shop) {
     {
       title: "Get order",
       description:
-        "Get an order by id, including payment and shipping status and any payment proofs.",
+        "Get an order by id, including payment and shipping status, any payment proofs, and the full status timeline (order_events). Use this for the automatic 6-hour order tracking checks.",
       inputSchema: { order_id: z.string() },
     },
     async ({ order_id }) => {
       const order = await db.getOrder(env.DB, order_id);
       if (!order) throw new Error(`unknown order_id: ${order_id}`);
       return text({ order });
+    }
+  );
+
+  server.registerTool(
+    "mark_shipped",
+    {
+      title: "Mark shipped (seller)",
+      description:
+        "SELLER-ONLY tool: mark a paid order as shipped, with optional carrier and tracking_number. Requires the order to be paid; on success the order becomes shipped. The seller admin web UI calls the same logic behind API-key auth; this MCP tool has no seller authentication in this demo.",
+      inputSchema: {
+        order_id: z.string(),
+        carrier: z.string().optional(),
+        tracking_number: z.string().optional(),
+      },
+    },
+    async ({ order_id, carrier, tracking_number }) => {
+      const order = await db.markShipped(env.DB, {
+        orderId: order_id,
+        carrier,
+        trackingNumber: tracking_number,
+      });
+      return text({
+        order,
+        note: `Order ${order_id} is now shipped${carrier ? ` via ${carrier}` : ""}${tracking_number ? `, tracking ${tracking_number}` : ""}. The buyer will be told automatically by their tracking task.`,
+      });
+    }
+  );
+
+  server.registerTool(
+    "confirm_receipt",
+    {
+      title: "Confirm receipt",
+      description:
+        "Buyer confirms receipt of a shipped order. Requires the order to be shipped; on success the order becomes completed. If the buyer does not confirm, the order auto-completes 7 days after shipping.",
+      inputSchema: { order_id: z.string() },
+    },
+    async ({ order_id }) => {
+      const order = await db.confirmReceipt(env.DB, { orderId: order_id });
+      return text({
+        order,
+        note: `Order ${order_id} is now completed. Thank you — the tracking task for this order stops here.`,
+      });
+    }
+  );
+
+  server.registerTool(
+    "cancel_order",
+    {
+      title: "Cancel order",
+      description:
+        "Cancel an order before it is paid. Only pending_payment and payment_submitted orders can be cancelled; a paid order cannot be cancelled this way (refunds are not supported in v1).",
+      inputSchema: {
+        order_id: z.string(),
+        reason: z.string().optional(),
+      },
+    },
+    async ({ order_id, reason }) => {
+      const order = await db.cancelOrder(env.DB, { orderId: order_id, reason });
+      return text({
+        order,
+        note: `Order ${order_id} is now cancelled. The tracking task for this order stops here.`,
+      });
     }
   );
 

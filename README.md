@@ -10,13 +10,25 @@ Live: https://agent-friendly-platform.refined-x.workers.dev
 - Discovery: give an agent a shop URL; it reads `{shop}/llms.txt`, then
   `openapi.json`, `agent.json`, `api/products.json`, `policies.json`.
 - Live MCP: `POST /shops/:shop/mcp` (Streamable HTTP, protocol 2025-06-18),
-  8 tools: `list_products`, `get_product`, `recommend_products`,
+  11 tools: `list_products`, `get_product`, `recommend_products`,
   `calculate_total`, `create_order`, `submit_payment_proof`,
-  `confirm_payment` (seller-side), `get_order`.
+  `confirm_payment` (seller-side), `get_order`, `mark_shipped`
+  (seller-side), `confirm_receipt`, `cancel_order`.
 - Payment is offline: the seller provides payment instructions in the
   order confirmation, the buyer pays outside the agent, then submits the
   transaction id; the seller verifies within 24h and ships in 2 business
   days. Never send card numbers or verification codes in chat.
+- Order tracking is automatic: after `create_order` the buyer's agent
+  checks `get_order` every 6 hours and tells the buyer when the status
+  changes, until `completed` or `cancelled`. Lifecycle:
+  `pending_payment` → `payment_submitted` → `paid` → `shipped` →
+  `completed` (buyer confirms receipt, or auto-completed 7 days after
+  shipping); cancellable before paid. Every status change is recorded
+  in the order timeline (`get_order.timeline`, or
+  `GET /shops/:shop/api/orders/:id/events`).
+- Seller admin: `/shops/:shop/admin/` (web UI + JSON API, one API key
+  per shop, see below). Sellers confirm payments, mark orders shipped,
+  and edit prices, stock and policies there.
 
 ## Shops
 
@@ -61,21 +73,54 @@ transport; the server is created fresh per request (stateless).
 `shop_policies`, `payment_methods`, `shop_payment`, `recommendations`,
 `shop_bundles`, `orders`, `payment_proofs`. `0002` adds
 `shop_payment.never_in_chat_json` (values that must never be sent in chat).
+`0003` adds `orders.verified_amount_cny / verified_at / verification_note`
+(seller payment verification). `0004` adds the order-tracking + admin
+schema: buyer info and shipping fields on `orders`
+(`buyer_name / buyer_contact / shipping_address / carrier /
+tracking_number / shipped_at / completed_at / cancelled_at /
+cancel_reason`), append-only `order_events` (one row per status change:
+`event / from_status / to_status / actor / note`), `shop_admin_keys`
+(SHA-256 hashes of per-shop admin keys only) and `admin_sessions`
+(hashed 24h session tokens).
 
 Order status flow: `pending_payment` → `payment_submitted` → `paid` →
-`shipped` → `delivered` (`returned` possible). `idempotency_key` is UNIQUE
-on `orders`: replays return the original order instead of creating a
-duplicate.
+`shipped` → `completed` (`cancelled` possible before paid). A daily
+cron trigger (02:00 UTC) runs the Worker's `scheduled()` handler, which
+auto-completes orders shipped more than 7 days ago with no buyer
+confirmation (event `auto_completed`). Orders without `shipped_at`
+(including all pre-1.2.0 orders) are never auto-completed.
+`idempotency_key` is UNIQUE on `orders`: replays return the original
+order instead of creating a duplicate.
 
 > **Seller verification is real, not simulated.** `submit_payment_proof`
 > only moves an order to `payment_submitted`. The seller then checks the
 > actual receipt (bank / WeChat / Alipay) and amount and calls the
 > seller-side tool `confirm_payment` with `verified_amount_cny`; the amount
 > must equal the order total, or the order stays `payment_submitted`. Only
-> then does the order become `paid` and ship. `confirm_payment` has no
-> seller authentication yet in this demo — that comes with the admin work
-> (`/admin` + API-key auth); until then, treat it as a seller-only tool
-> and do not expose it to buyers.
+> then does the order become `paid` and ship. The seller admin web UI
+> (`/shops/:shop/admin/`) calls the same `confirmPayment` logic behind
+> per-shop API-key auth; the MCP tool itself still has no seller
+> authentication, so in production the admin UI is the seller path.
+
+## Seller admin
+
+- Web UI: `https://agent-friendly-platform.refined-x.workers.dev/shops/:shop/admin/`
+  (dashboard counts, order list with status filter, order detail with
+  proofs + timeline, one-click confirm payment with amount-mismatch
+  warning, mark shipped, product price/stock editing, policy editing).
+- Auth: one API key per shop. Keys are generated with
+  `python3 scripts/gen_admin_keys.py <account-id> <database-id>`; only
+  SHA-256 hashes are stored in D1, the plaintext keys are printed once
+  and must be handed to the shop owners (never committed). Login sets an
+  httpOnly session cookie (24h); API calls also accept
+  `Authorization: Bearer <key>`.
+- JSON API (all under `/shops/:shop/admin/api/`, auth required):
+  `GET /me`, `POST /login`, `POST /logout`,
+  `GET /orders?status=&limit=`, `GET /orders/:id`,
+  `POST /orders/:id/confirm-payment`, `POST /orders/:id/mark-shipped`,
+  `POST /orders/:id/cancel`, `GET|PUT /products/:id`,
+  `GET|PUT /policies`. Admin routes are not listed in `llms.txt` /
+  `agent.json` — the admin is for the human seller, not buyers' agents.
 
 ## Local development
 
@@ -123,6 +168,8 @@ No custom domain yet (by Hall's choice).
 
 ```sh
 python3 tests/test_client.py [shop]   # MCP end-to-end (default terra-pots)
+ADMIN_KEY=<terra-pots admin key> python3 tests/test_admin.py
+                                       # seller admin API end-to-end
 python3 tests/compare_routes.py       # every route vs GitHub Pages
 ```
 
@@ -147,6 +194,30 @@ mug x1 → order `ord_mwbqmz0cy8ru`, 140, `pending_payment`;
 that were marked `paid` under the old simulated flow keep their `paid`
 status with `verified_amount_cny` null — they were never seller-verified,
 and the migration did not rewrite them.
+
+Order tracking + seller admin (verified live 2026-11-11, v1.2.0):
+`python3 tests/test_client.py` — tools/list → 11 tools; `create_order`
+mug x1 (with buyer name/contact/address) → order `ord_mwbrdvelxsaq`,
+140, `pending_payment`, timeline starts with `order_created`;
+`confirm_receipt` on a pending order → error; `submit_payment_proof`
+→ `payment_submitted`; `confirm_payment` 100 → error, 140 → `paid`;
+`cancel_order` on the paid order → error; `mark_shipped` (顺丰,
+SF1234567890) → `shipped`; `confirm_receipt` → `completed`; timeline
+is exactly `[order_created, payment_proof_submitted,
+payment_confirmed, shipped, receipt_confirmed]`; a second order
+cancelled before paying → `cancelled`. **E2E PASS.**
+`ADMIN_KEY=... python3 tests/test_admin.py` — admin without a key →
+401, wrong key → 401, login → session cookie, `/me` OK; fresh order
+`ord_mwbre7zpoiw7` confirmed and shipped through the admin API
+(`confirm_payment` 100 → 400, 140 → `paid`; `mark-shipped` →
+`shipped`, tracking SF999888777); buyer `confirm_receipt` →
+`completed`; events endpoint returns the same 5-event timeline;
+products PUT round-trip (stock +1, then restored); policies GET shows
+the new status list. **ADMIN E2E PASS.** Auto-complete: a shipped
+order backdated 8 days (`ord_mwbrfdkxt5m1`) is the only row the
+auto-complete query selects; old paid orders have no `shipped_at` and
+are excluded. The cron trigger itself (daily 02:00 UTC) has not fired
+yet — the backdated order is expected to complete on the next run.
 
 ## Migration notes (from GitHub Pages + agent-friendly-mcp)
 
@@ -186,8 +257,11 @@ and the migration did not rewrite them.
   GitHub Pages. The old `agent-friendly-mcp` Worker and the Pages site
   are still the live ones agents see today.
 - Custom domain (deferred by Hall).
-- Seller verification of payment is now real (`confirm_payment`, see above);
-  seller authentication for it is still future work (admin routes).
 - Test with a real MCP client (Claude Code / Cursor); so far only the
   raw JSON-RPC client has been used.
-- Seller admin routes (future: `/admin` + API-key auth middleware).
+- The daily auto-complete cron trigger is set (02:00 UTC) but has not
+  fired yet; the first run is expected to complete the backdated test
+  order `ord_mwbrfdkxt5m1`.
+- Seller admin is built (`/shops/:shop/admin/` + per-shop API keys);
+  refunds, product listing/unlisting and multi-staff permissions are
+  still future work.

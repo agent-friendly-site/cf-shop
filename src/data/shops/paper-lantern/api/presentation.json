@@ -255,9 +255,9 @@
    "detail": "运费 12 元，满 200 免邮"
   },
   {
-   "title": "签收",
-   "time": "物流送达",
-   "detail": "7 天内可退，退货运费买家付"
+   "title": "确认收货",
+   "time": "签收后",
+   "detail": "买家确认收货，订单完成；发货满 7 天无人确认，自动完成"
   }
  ],
  "payment": "https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/api/payment.json",
@@ -345,5 +345,24 @@
    "contents": "comparison table + total calculator, built only from IR data"
   },
   "fallback": "Plain Markdown table with numbered options, same facts as the IR."
+ },
+ "order_tracking": {
+  "poll_interval_hours": 6,
+  "terminal_statuses": [
+   "completed",
+   "cancelled"
+  ],
+  "note": "create_order 成功后 agent 自动建跟踪任务：每 6 小时查一次 get_order，状态没变不打扰，变了就主动告诉买家，并给可点选项；到终态停掉检查并发结尾消息。买家不用记订单号。",
+  "status_messages": {
+   "payment_submitted": "已收到你的付款凭据，卖家正在核对到账，一般 24 小时内完成。",
+   "paid": "卖家已确认收到你的付款，正在准备发货，2 个工作日内发出。",
+   "shipped": "你的订单已发货，快递 {carrier}，单号 {tracking_number}。收到货后告诉我，我帮你确认收货。",
+   "completed": "订单已完成，谢谢惠顾。",
+   "cancelled": "订单已取消。"
+  },
+  "shipped_actions": [
+   "确认收货",
+   "查看订单"
+  ]
  }
 }

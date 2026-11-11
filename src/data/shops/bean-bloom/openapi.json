@@ -2,7 +2,7 @@
  "openapi": "3.1.0",
  "info": {
   "title": "Bean Bloom Coffee — Agent API",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Small-batch roasted coffee beans, shipped from Yunnan. Agent-first storefront at https://agent-friendly-platform.refined-x.workers.dev/shops/bean-bloom/ Paths in this document are absolute from the host root, e.g. /shops/bean-bloom/llms.txt."
  },
  "servers": [
@@ -85,7 +85,7 @@
    "post": {
     "operationId": "mcpStreamableHttp",
     "summary": "MCP Streamable HTTP (live)",
-    "description": "Live endpoint: POST https://agent-friendly-platform.refined-x.workers.dev/shops/bean-bloom/mcp, Streamable HTTP, protocol 2025-06-18, tools: list_products, get_product, recommend_products, calculate_total, create_order, submit_payment_proof, confirm_payment, get_order. Catalog and orders are served from D1 on this Worker. See mcp.json."
+    "description": "Live endpoint: POST https://agent-friendly-platform.refined-x.workers.dev/shops/bean-bloom/mcp, Streamable HTTP, protocol 2025-06-18, tools: list_products, get_product, recommend_products, calculate_total, create_order, submit_payment_proof, confirm_payment, get_order, mark_shipped, confirm_receipt, cancel_order. Catalog and orders are served from D1 on this Worker. See mcp.json."
    }
   },
   "/shops/bean-bloom/guide.md": {
@@ -124,6 +124,76 @@
     "responses": {
      "200": {
       "description": "Offline payment methods, flow, and proof submission"
+     }
+    }
+   }
+  },
+  "/shops/bean-bloom/api/orders/{order_id}/events": {
+   "get": {
+    "operationId": "getOrderEvents",
+    "description": "Order status timeline (order_events) for one order. Public read; the order id is the credential.",
+    "responses": {
+     "200": {
+      "description": "Order id, current status and the event timeline"
+     }
+    }
+   }
+  },
+  "/shops/bean-bloom/admin/": {
+   "get": {
+    "operationId": "getAdminUi",
+    "description": "Seller admin web UI (human seller only, API-key login). Not for buyers' agents; not listed in llms.txt / agent.json.",
+    "responses": {
+     "200": {
+      "description": "Admin HTML page"
+     }
+    }
+   }
+  },
+  "/shops/bean-bloom/admin/api/orders": {
+   "get": {
+    "operationId": "adminListOrders",
+    "description": "Seller admin: list orders (filter by status). Requires the shop admin key (Bearer) or session cookie.",
+    "responses": {
+     "200": {
+      "description": "Order counts by status + order list"
+     },
+     "401": {
+      "description": "Admin authentication required"
+     }
+    }
+   }
+  },
+  "/shops/bean-bloom/admin/api/orders/{order_id}/confirm-payment": {
+   "post": {
+    "operationId": "adminConfirmPayment",
+    "description": "Seller admin: confirm receipt of an offline payment (same logic as the confirm_payment MCP tool). verified_amount_cny must equal the order total.",
+    "responses": {
+     "200": {
+      "description": "Order now paid"
+     },
+     "400": {
+      "description": "Precondition failed (wrong status or amount)"
+     },
+     "401": {
+      "description": "Admin authentication required"
+     }
+    }
+   }
+  },
+  "/shops/bean-bloom/admin/api/orders/{order_id}/mark-shipped": {
+   "post": {
+    "operationId": "adminMarkShipped",
+    "description": "Seller admin: mark a paid order shipped (carrier + tracking_number optional).",
+    "responses": {
+     "200": {
+      "description": "Order now shipped"
+     },
+     "400": {
+      "description": "Precondition failed"
+     },
+     "401": {
+      "description": "Admin authentication required"
      }
     }
    }

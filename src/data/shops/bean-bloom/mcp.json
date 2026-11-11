@@ -38,20 +38,15 @@
    },
    {
     "name": "create_order",
-    "description": "Create an order. Requires idempotency_key. Returns the order with payment instructions (offline payment). Status starts as pending_payment.",
+    "description": "Create an order. Requires idempotency_key. Returns the order with payment instructions (offline payment). Status starts as pending_payment. Ask the buyer for name, contact and shipping address at the confirmation step (buyer_name / buyer_contact / shipping_address, optional).",
     "readOnlyHint": false,
     "input": {
      "items": "array of {product_id: string, quantity: integer}",
      "idempotency_key": "string",
-     "buyer_note": "string (optional)"
-    }
-   },
-   {
-    "name": "get_order",
-    "description": "Get an order by id, including payment and shipping status.",
-    "readOnlyHint": true,
-    "input": {
-     "order_id": "string"
+     "buyer_note": "string (optional)",
+     "buyer_name": "string (optional)",
+     "buyer_contact": "string (optional)",
+     "shipping_address": "string (optional)"
     }
    },
    {
@@ -73,6 +68,41 @@
      "order_id": "string",
      "verified_amount_cny": "number",
      "note": "string (optional)"
+    }
+   },
+   {
+    "name": "get_order",
+    "description": "Get an order by id, including payment and shipping status, payment proofs, and the full status timeline. Use this for the automatic 6-hour order tracking checks.",
+    "readOnlyHint": true,
+    "input": {
+     "order_id": "string"
+    }
+   },
+   {
+    "name": "mark_shipped",
+    "description": "SELLER-ONLY: mark a paid order as shipped, with optional carrier and tracking_number. Requires the order to be paid. The seller admin web UI calls the same logic behind API-key auth.",
+    "readOnlyHint": false,
+    "input": {
+     "order_id": "string",
+     "carrier": "string (optional)",
+     "tracking_number": "string (optional)"
+    }
+   },
+   {
+    "name": "confirm_receipt",
+    "description": "Buyer confirms receipt of a shipped order; the order becomes completed. If the buyer does not confirm, the order auto-completes 7 days after shipping.",
+    "readOnlyHint": false,
+    "input": {
+     "order_id": "string"
+    }
+   },
+   {
+    "name": "cancel_order",
+    "description": "Cancel an order before it is paid. Only pending_payment and payment_submitted orders can be cancelled; a paid order cannot be cancelled this way.",
+    "readOnlyHint": false,
+    "input": {
+     "order_id": "string",
+     "reason": "string (optional)"
     }
    }
   ],
@@ -101,7 +131,7 @@
   "payment": {
    "method": "offline",
    "descriptor": "https://agent-friendly-platform.refined-x.workers.dev/shops/bean-bloom/api/payment.json",
-   "note": "确认订单后，卖家提供线下收款方式；买家在 Agent 外付款，付款后把交易单号发给 Agent，订单变为待核验；卖家核对到账和金额后用 confirm_payment 确认（金额必须等于订单总额），确认后才标记已付款并发货。不要在聊天里索要或接收银行卡号、验证码。"
+   "note": "确认订单后，卖家提供线下收款方式；买家在 Agent 外付款，付款后把交易单号发给 Agent，订单变为待核验；卖家核对到账和金额后用 confirm_payment 确认（金额必须等于订单总额），确认后才标记已付款并发货；发货后买家用 confirm_receipt 确认收货，订单完成，7 天无人确认自动完成；付款前可用 cancel_order 取消。不要在聊天里索要或接收银行卡号、验证码。"
   }
  }
 }

@@ -55,7 +55,12 @@
    {
     "step": 6,
     "title": "发货与交付",
-    "detail": "核验通过后 2 个工作日内发货；签收后 7 天内可退，退货运费买家付。"
+    "detail": "核验通过后 2 个工作日内发货；发货后订单状态为 shipped。"
+   },
+   {
+    "step": 7,
+    "title": "确认收货",
+    "detail": "收到货后，买家让 Agent 用 confirm_receipt 确认收货，订单变为 completed；发货满 7 天无人确认，订单自动完成。付款前买家或卖家可用 cancel_order 取消订单。"
    }
   ],
   "order_statuses": [
@@ -63,8 +68,8 @@
    "payment_submitted",
    "paid",
    "shipped",
-   "delivered",
-   "returned"
+   "completed",
+   "cancelled"
   ]
  }
 }
