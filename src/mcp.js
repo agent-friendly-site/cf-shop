@@ -2,8 +2,11 @@
 // Uses the official @modelcontextprotocol/sdk McpServer +
 // WebStandardStreamableHTTPServerTransport, the pattern from the SDK's own
 // Hono example (honoWebStandardStreamableHttp). Tools are backed by D1.
-// Seller verification is SIMULATED for this demo: submitting a transaction
-// id marks the order paid; a real deployment must verify receipt first.
+// Payment verification is real seller verification: submit_payment_proof
+// only marks the order payment_submitted; the seller must check the actual
+// receipt and amount and call confirm_payment, which marks it paid.
+// NOTE: confirm_payment currently has no seller authentication in this
+// demo; seller auth comes with the admin work (see README).
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import * as db from "./db.js";
@@ -34,7 +37,7 @@ function publicProduct(p) {
 export function createMcpServer(env, shop) {
   const server = new McpServer({
     name: "agent-friendly-platform",
-    version: "1.0.0",
+    version: "1.1.0",
   });
 
   server.registerTool(
@@ -151,7 +154,7 @@ export function createMcpServer(env, shop) {
     {
       title: "Submit payment proof",
       description:
-        "Submit offline payment proof (transaction id) for an order. The seller verifies receipt before shipping. Never send card numbers or verification codes.",
+        "Submit offline payment proof (transaction id) for an order. The order becomes payment_submitted (awaiting seller verification), NOT paid. The seller must then verify the actual receipt and amount with confirm_payment; only then does the order become paid and ship. Never send card numbers or verification codes.",
       inputSchema: {
         order_id: z.string(),
         payment_method: z.string(),
@@ -171,7 +174,33 @@ export function createMcpServer(env, shop) {
       return text({
         order,
         verification:
-          "卖家核验说明（模拟核验）：提交了交易单号即标记为已付款。真实部署中，卖家须先核对到账再标记已付款、再发货。",
+          "订单已标记为待核验（payment_submitted），不是已付款。卖家须核对到账和金额后用 confirm_payment 确认，确认后订单才变为已付款并发货。",
+        next_step: "Seller: check the actual receipt (bank / WeChat / Alipay) and amount, then call confirm_payment with verified_amount_cny equal to the order total.",
+      });
+    }
+  );
+
+  server.registerTool(
+    "confirm_payment",
+    {
+      title: "Confirm payment (seller)",
+      description:
+        "SELLER-ONLY tool: confirm that an offline payment was actually received, after checking the real receipt (bank / WeChat / Alipay) outside the agent. Input: order_id and verified_amount_cny, the amount the seller actually received. Requires the order to be payment_submitted, to have at least one payment proof, and verified_amount_cny to equal the order total_cny; on mismatch the order stays payment_submitted and is not marked paid. On success the order becomes paid. NOTE: this demo has no seller authentication on this tool yet; in production it must only be callable by the seller (see README, admin work).",
+      inputSchema: {
+        order_id: z.string(),
+        verified_amount_cny: z.number(),
+        note: z.string().optional(),
+      },
+    },
+    async ({ order_id, verified_amount_cny, note }) => {
+      const order = await db.confirmPayment(env.DB, {
+        orderId: order_id,
+        verifiedAmountCny: verified_amount_cny,
+        note,
+      });
+      return text({
+        order,
+        verification: `Seller confirmed receipt of ${verified_amount_cny} CNY for order ${order_id}; order is now paid and can ship.`,
       });
     }
   );

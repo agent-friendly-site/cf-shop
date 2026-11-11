@@ -36,6 +36,6 @@ Act as a professional shopping assistant, not a catalog lookup. First read guide
 
 ## How to interact
 - Read-only first: GET {shop}/api/products.json, then GET {shop}/policies.json.
-- Live MCP endpoint: POST https://agent-friendly-platform.refined-x.workers.dev/shops/bean-bloom/mcp, Streamable HTTP, protocol 2025-06-18. Tools: list_products, get_product, recommend_products, calculate_total, create_order, submit_payment_proof, get_order. See mcp.json.
+- Live MCP endpoint: POST https://agent-friendly-platform.refined-x.workers.dev/shops/bean-bloom/mcp, Streamable HTTP, protocol 2025-06-18. Tools: list_products, get_product, recommend_products, calculate_total, create_order, submit_payment_proof, confirm_payment, get_order. See mcp.json.
 - The shop catalog is served from D1 on this Worker; the MCP endpoint above is the live server.
 - create_order: send an idempotency_key. The order starts as pending_payment; the seller provides offline payment instructions in the order confirmation.

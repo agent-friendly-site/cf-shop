@@ -34,17 +34,21 @@
   "tools": [
    "list_products",
    "get_product",
+   "recommend_products",
+   "calculate_total",
    "create_order",
+   "submit_payment_proof",
+   "confirm_payment",
    "get_order"
   ],
-  "status": "documented-on-github-pages"
+  "status": "live"
  },
  "discovery": [
   "GET {shop}/",
   "GET {shop}/llms.txt",
   "GET {shop}/openapi.json",
   "GET {shop}/agent.json",
-  "POST {shop}/mcp tools/list"
+  "POST https://agent-friendly-platform.refined-x.workers.dev/shops/{shop}/mcp tools/list"
  ],
  "persona": "professional shopping assistant",
  "guide": "https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/guide.md",

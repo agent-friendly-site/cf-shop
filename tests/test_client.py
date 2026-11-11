@@ -70,9 +70,30 @@ def main():
                                 "idempotency_key": key})
     order = json.loads(res["result"]["content"][0]["text"])["order"]
     print(f"\nORDER ID: {order['id']}  TOTAL: {order['total_cny']}  STATUS: {order['status']}")
-    tool("submit_payment_proof", {"order_id": order["id"], "payment_method": "wechat_pay",
-                                  "transaction_id": f"test-txn-{uuid.uuid4().hex[:8]}",
-                                  "amount_cny": order["total_cny"]})
+    assert order["status"] == "pending_payment", "expected pending_payment"
+    # Submitting a proof must NOT mark the order paid — only payment_submitted.
+    res = tool("submit_payment_proof", {"order_id": order["id"], "payment_method": "wechat_pay",
+                                        "transaction_id": f"test-txn-{uuid.uuid4().hex[:8]}",
+                                        "amount_cny": order["total_cny"]})
+    submitted = json.loads(res["result"]["content"][0]["text"])["order"]
+    print(f"\nAFTER PROOF: {submitted['status']}  PROOFS: {len(submitted['proofs'])}")
+    assert submitted["status"] == "payment_submitted", "expected payment_submitted"
+    # Wrong verified amount must fail and leave the order payment_submitted.
+    res = tool("confirm_payment", {"order_id": order["id"], "verified_amount_cny": 100,
+                                   "note": "test: wrong amount"})
+    # The MCP SDK reports tool errors as result.isError, not a top-level
+    # JSON-RPC "error" field.
+    assert res.get("result", {}).get("isError") is True, f"expected confirm_payment with 100 to fail, got: {res}"
+    print(f"\nWRONG-AMOUNT CONFIRM REJECTED: {res['result']['content'][0]['text']}")
+    mid = json.loads(tool("get_order", {"order_id": order["id"]})["result"]["content"][0]["text"])["order"]
+    assert mid["status"] == "payment_submitted", "expected still payment_submitted after failed confirm"
+    # Correct amount confirms and marks paid.
+    res = tool("confirm_payment", {"order_id": order["id"], "verified_amount_cny": order["total_cny"],
+                                   "note": "test: seller verified receipt"})
+    confirmed = json.loads(res["result"]["content"][0]["text"])["order"]
+    print(f"\nAFTER CONFIRM: {confirmed['status']}  VERIFIED: {confirmed.get('verified_amount_cny')} at {confirmed.get('verified_at')}")
+    assert confirmed["status"] == "paid", "expected paid"
+    assert confirmed.get("verified_amount_cny") == order["total_cny"], "expected verified amount = total"
     res = tool("get_order", {"order_id": order["id"]})
     final = json.loads(res["result"]["content"][0]["text"])["order"]
     print(f"\nFINAL STATUS: {final['status']}  PROOFS: {len(final['proofs'])}")

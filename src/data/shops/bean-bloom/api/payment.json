@@ -45,12 +45,12 @@
    {
     "step": 4,
     "title": "提交付款凭据",
-    "detail": "买家把交易单号发给 Agent（可用 submit_payment_proof 工具），也可附付款截图说明。"
+    "detail": "买家把交易单号发给 Agent（可用 submit_payment_proof 工具），也可附付款截图说明。提交后订单状态为 payment_submitted（待核验），不是已付款。"
    },
    {
     "step": 5,
     "title": "卖家核验",
-    "detail": "卖家在 24 小时内核对到账；金额不符或查不到时联系买家核对。"
+    "detail": "卖家在 24 小时内核对到账和金额（用 confirm_payment 工具，verified_amount_cny 必须等于订单总额）；金额不符或查不到时联系买家核对，订单保持待核验，不发货。"
    },
    {
     "step": 6,

@@ -26,7 +26,7 @@ import * as db from "./db.js";
 import { dataFile } from "./data.js";
 
 const BASE = "https://agent-friendly-platform.refined-x.workers.dev";
-const VERSION = "1.0.0";
+const VERSION = "1.1.0";
 
 const app = new Hono();
 

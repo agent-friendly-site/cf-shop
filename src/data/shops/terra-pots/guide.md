@@ -64,7 +64,7 @@ Adapters: Muse = clickable options / cards; Claude = MCP Apps widget (platform-o
 
 确认订单后，卖家提供线下收款方式；买家在 Agent 外付款，付款后把交易单号发给 Agent；卖家核验到账后发货。不要在聊天里索要或接收银行卡号、验证码。
 
-流程：确认订单 → 卖家提供收款方式 → 买家线下付款 → 提交付款凭据（submit_payment_proof，传 order_id、payment_method、transaction_id）→ 卖家 24 小时内核验 → 发货。
+流程：确认订单 → 卖家提供收款方式 → 买家线下付款 → 提交付款凭据（submit_payment_proof，传 order_id、payment_method、transaction_id，订单变为待核验 payment_submitted）→ 卖家 24 小时内核对到账和金额，用 confirm_payment 确认（金额必须等于订单总额）→ 已付款 → 发货。
 
 ## Muse rich UI — how to show this shop
 

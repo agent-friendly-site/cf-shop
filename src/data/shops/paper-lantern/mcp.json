@@ -56,13 +56,23 @@
    },
    {
     "name": "submit_payment_proof",
-    "description": "Submit offline payment proof for an order: transaction id and payment method. Submitting a transaction id marks the order paid (verification is simulated: a real deployment must verify receipt first — see api/payment.json, seller verifies within 24h). Never send card numbers or verification codes.",
+    "description": "Submit offline payment proof for an order: transaction id and payment method. The order becomes payment_submitted (awaiting seller verification), NOT paid. The seller must then verify the actual receipt and amount with confirm_payment. Never send card numbers or verification codes.",
     "readOnlyHint": false,
     "input": {
      "order_id": "string",
      "payment_method": "string",
      "transaction_id": "string",
      "amount_cny": "number"
+    }
+   },
+   {
+    "name": "confirm_payment",
+    "description": "SELLER-ONLY: confirm that an offline payment was actually received, after checking the real receipt (bank / WeChat / Alipay). Requires the order to be payment_submitted with at least one proof, and verified_amount_cny must equal the order total; on mismatch the order stays payment_submitted. On success the order becomes paid. No seller authentication on this tool yet in this demo.",
+    "readOnlyHint": false,
+    "input": {
+     "order_id": "string",
+     "verified_amount_cny": "number",
+     "note": "string (optional)"
     }
    }
   ],
@@ -91,7 +101,7 @@
   "payment": {
    "method": "offline",
    "descriptor": "https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/api/payment.json",
-   "note": "确认订单后，卖家提供线下收款方式；买家在 Agent 外付款，付款后把交易单号发给 Agent；卖家核验到账后发货。不要在聊天里索要或接收银行卡号、验证码。Verification note: the Worker marks the order paid when a transaction id is submitted (simulated verification); a real deployment must verify receipt first."
+   "note": "确认订单后，卖家提供线下收款方式；买家在 Agent 外付款，付款后把交易单号发给 Agent，订单变为待核验；卖家核对到账和金额后用 confirm_payment 确认（金额必须等于订单总额），确认后才标记已付款并发货。不要在聊天里索要或接收银行卡号、验证码。"
   }
  }
 }

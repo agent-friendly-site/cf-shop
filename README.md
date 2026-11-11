@@ -10,8 +10,9 @@ Live: https://agent-friendly-platform.refined-x.workers.dev
 - Discovery: give an agent a shop URL; it reads `{shop}/llms.txt`, then
   `openapi.json`, `agent.json`, `api/products.json`, `policies.json`.
 - Live MCP: `POST /shops/:shop/mcp` (Streamable HTTP, protocol 2025-06-18),
-  7 tools: `list_products`, `get_product`, `recommend_products`,
-  `calculate_total`, `create_order`, `submit_payment_proof`, `get_order`.
+  8 tools: `list_products`, `get_product`, `recommend_products`,
+  `calculate_total`, `create_order`, `submit_payment_proof`,
+  `confirm_payment` (seller-side), `get_order`.
 - Payment is offline: the seller provides payment instructions in the
   order confirmation, the buyer pays outside the agent, then submits the
   transaction id; the seller verifies within 24h and ships in 2 business
@@ -61,14 +62,20 @@ transport; the server is created fresh per request (stateless).
 `shop_bundles`, `orders`, `payment_proofs`. `0002` adds
 `shop_payment.never_in_chat_json` (values that must never be sent in chat).
 
-Order status flow: `pending_payment` → `paid` → `shipped` → `delivered`
-(`returned` possible). `idempotency_key` is UNIQUE on `orders`: replays
-return the original order instead of creating a duplicate.
+Order status flow: `pending_payment` → `payment_submitted` → `paid` →
+`shipped` → `delivered` (`returned` possible). `idempotency_key` is UNIQUE
+on `orders`: replays return the original order instead of creating a
+duplicate.
 
-> **Verification is simulated for this demo.** `submit_payment_proof`
-> marks the order `paid` when a transaction id is submitted. A real
-> deployment must verify receipt before marking paid. This is stated in
-> the code (`src/db.js`), in the tool result, and in `mcp.json`.
+> **Seller verification is real, not simulated.** `submit_payment_proof`
+> only moves an order to `payment_submitted`. The seller then checks the
+> actual receipt (bank / WeChat / Alipay) and amount and calls the
+> seller-side tool `confirm_payment` with `verified_amount_cny`; the amount
+> must equal the order total, or the order stays `payment_submitted`. Only
+> then does the order become `paid` and ship. `confirm_payment` has no
+> seller authentication yet in this demo — that comes with the admin work
+> (`/admin` + API-key auth); until then, treat it as a seller-only tool
+> and do not expose it to buyers.
 
 ## Local development
 
@@ -126,7 +133,20 @@ MCP end-to-end (verified live 2026-11-11): initialize → protocol
 alternative plate; `calculate_total` mug x1 → `128 元 + 12 元运费 = 140 元`;
 `create_order` mug x1 → order `ord_mwbmqj05ft5d`, 140, `pending_payment`;
 `submit_payment_proof` (WeChat, test txn) → `paid`; `get_order` → `paid`
-with 1 proof. **E2E PASS.**
+with 1 proof. **E2E PASS.** (That run used the old simulated flow. Since
+1.1.0, `submit_payment_proof` only reaches `payment_submitted` and
+`confirm_payment` is required — see the 1.1.0 test below.)
+
+MCP end-to-end, seller verification (verified live 2026-11-11, v1.1.0,
+`python3 tests/test_client.py`): tools/list → 8 tools; `create_order`
+mug x1 → order `ord_mwbqmz0cy8ru`, 140, `pending_payment`;
+`submit_payment_proof` (WeChat, test txn, 140) → `payment_submitted`;
+`confirm_payment` with 100 → error, stays `payment_submitted`;
+`confirm_payment` with 140 → `paid` (`verified_amount_cny` 140);
+`get_order` → `paid` with 1 proof. **E2E PASS.** Pre-1.1.0 test orders
+that were marked `paid` under the old simulated flow keep their `paid`
+status with `verified_amount_cny` null — they were never seller-verified,
+and the migration did not rewrite them.
 
 ## Migration notes (from GitHub Pages + agent-friendly-mcp)
 
@@ -166,7 +186,8 @@ with 1 proof. **E2E PASS.**
   GitHub Pages. The old `agent-friendly-mcp` Worker and the Pages site
   are still the live ones agents see today.
 - Custom domain (deferred by Hall).
-- Real seller verification of payment (currently simulated, see above).
+- Seller verification of payment is now real (`confirm_payment`, see above);
+  seller authentication for it is still future work (admin routes).
 - Test with a real MCP client (Claude Code / Cursor); so far only the
   raw JSON-RPC client has been used.
 - Seller admin routes (future: `/admin` + API-key auth middleware).

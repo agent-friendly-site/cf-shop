@@ -108,6 +108,9 @@ function orderShape(row, proofs) {
     status: row.status,
     idempotency_key: row.idempotency_key,
     buyer_note: row.buyer_note,
+    verified_amount_cny: row.verified_amount_cny ?? null,
+    verified_at: row.verified_at ?? null,
+    verification_note: row.verification_note ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
     proofs: proofs || [],
@@ -145,6 +148,15 @@ export async function createOrder(db, { shop, items, total, idempotencyKey, buye
 export async function addPaymentProof(db, { orderId, paymentMethod, transactionId, amountCny }) {
   const order = await getOrder(db, orderId);
   if (!order) return null;
+  // Submitting a proof never marks the order paid. It records the proof and
+  // moves the order to payment_submitted (awaiting seller verification).
+  // A proof on an already-paid (or later) order is rejected: the payment
+  // is already verified and must not be re-opened by a new proof.
+  if (order.status !== "pending_payment" && order.status !== "payment_submitted") {
+    const e = new Error(`order ${orderId} is already ${order.status}; cannot submit a payment proof`);
+    e.code = -32000;
+    throw e;
+  }
   const now = new Date().toISOString();
   const id = `proof_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   await db
@@ -153,11 +165,50 @@ export async function addPaymentProof(db, { orderId, paymentMethod, transactionI
     )
     .bind(id, orderId, paymentMethod, transactionId, amountCny, now)
     .run();
-  // NOTE: verification is SIMULATED for this demo — submitting a transaction
-  // id marks the order paid. A real deployment must verify receipt first.
   await db
-    .prepare("UPDATE orders SET status = 'paid', updated_at = ? WHERE id = ?")
+    .prepare("UPDATE orders SET status = 'payment_submitted', updated_at = ? WHERE id = ?")
     .bind(now, orderId)
+    .run();
+  return getOrder(db, orderId);
+}
+
+// Seller-side step: confirm receipt of the offline payment.
+// Preconditions: the order exists, its status is payment_submitted, it has
+// at least one proof, and verifiedAmountCny equals the order total.
+// On mismatch the order stays payment_submitted and nothing is changed.
+// On success the order becomes paid and the verified amount/time are recorded.
+export async function confirmPayment(db, { orderId, verifiedAmountCny, note }) {
+  const order = await getOrder(db, orderId);
+  if (!order) {
+    const e = new Error(`unknown order_id: ${orderId}`);
+    e.code = -32602;
+    throw e;
+  }
+  if (order.status !== "payment_submitted") {
+    const e = new Error(
+      `order ${orderId} is ${order.status}, not payment_submitted; only an order awaiting verification can be confirmed`
+    );
+    e.code = -32000;
+    throw e;
+  }
+  if (!order.proofs || order.proofs.length === 0) {
+    const e = new Error(`order ${orderId} has no payment proof; cannot confirm payment`);
+    e.code = -32000;
+    throw e;
+  }
+  if (verifiedAmountCny !== order.total_cny) {
+    const e = new Error(
+      `verified amount ${verifiedAmountCny} CNY does not match order total ${order.total_cny} CNY; order stays payment_submitted`
+    );
+    e.code = -32000;
+    throw e;
+  }
+  const now = new Date().toISOString();
+  await db
+    .prepare(
+      "UPDATE orders SET status = 'paid', verified_amount_cny = ?, verified_at = ?, verification_note = ?, updated_at = ? WHERE id = ?"
+    )
+    .bind(verifiedAmountCny, now, note || null, now, orderId)
     .run();
   return getOrder(db, orderId);
 }

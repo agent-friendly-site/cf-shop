@@ -38,6 +38,7 @@
    "calculate_total",
    "create_order",
    "submit_payment_proof",
+   "confirm_payment",
    "get_order"
   ],
   "status": "live"

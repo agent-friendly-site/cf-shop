@@ -2,7 +2,7 @@
  "openapi": "3.1.0",
  "info": {
   "title": "Paper Lantern Stationery — Agent API",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Notebooks and pens for people who still write by hand. Agent-first storefront at https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/ Paths in this document are absolute from the host root, e.g. /shops/paper-lantern/llms.txt."
  },
  "servers": [
@@ -85,7 +85,7 @@
    "post": {
     "operationId": "mcpStreamableHttp",
     "summary": "MCP Streamable HTTP (live)",
-    "description": "Live endpoint: POST https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/mcp, Streamable HTTP, protocol 2025-06-18, tools: list_products, get_product, recommend_products, calculate_total, create_order, submit_payment_proof, get_order. Catalog and orders are served from D1 on this Worker. See mcp.json."
+    "description": "Live endpoint: POST https://agent-friendly-platform.refined-x.workers.dev/shops/paper-lantern/mcp, Streamable HTTP, protocol 2025-06-18, tools: list_products, get_product, recommend_products, calculate_total, create_order, submit_payment_proof, confirm_payment, get_order. Catalog and orders are served from D1 on this Worker. See mcp.json."
    }
   },
   "/shops/paper-lantern/guide.md": {
