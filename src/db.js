@@ -298,6 +298,108 @@ export async function addPaymentProof(db, { orderId, paymentMethod, transactionI
   return getOrder(db, orderId);
 }
 
+// --- one-time proof upload links (v1.6.0) ---
+// The buyer opens the link in a browser and uploads the payment
+// screenshot directly to the platform (R2). The image never goes
+// through the buyer's agent: no agent-side image recognition, no
+// transaction id to extract. The seller verifies the screenshot
+// visually in the admin UI and confirms with the amount read off it.
+// Tokens are single-use, expire after PROOF_UPLOAD_TTL_DAYS, and only
+// the SHA-256 hash is stored — the same pattern as admin sessions.
+export const PROOF_UPLOAD_TTL_DAYS = 7;
+
+export function proofUploadUrl(shop, orderId, token) {
+  return `https://agent-friendly-platform.refined-x.workers.dev/shops/${shop}/orders/${orderId}/upload-proof?token=${token}`;
+}
+
+export async function createProofUploadToken(db, { shop, orderId, ttlDays = PROOF_UPLOAD_TTL_DAYS }) {
+  const order = await getOrder(db, orderId);
+  if (!order) {
+    const e = new Error(`unknown order_id: ${orderId}`);
+    e.code = -32602;
+    throw e;
+  }
+  if (order.shop !== shop) {
+    const e = new Error(`order ${orderId} does not belong to shop ${shop}`);
+    e.code = -32602;
+    throw e;
+  }
+  if (!["pending_payment", "payment_submitted"].includes(order.status)) {
+    const e = new Error(`order ${orderId} is ${order.status}; a payment proof can no longer be uploaded`);
+    e.code = -32000;
+    throw e;
+  }
+  // A fresh token on every call: only the hash is stored, so an earlier
+  // token cannot be reconstructed. Earlier unused tokens stay valid
+  // until they expire or are used; that is harmless.
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  const token = [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const now = new Date().toISOString();
+  const expires = new Date(Date.now() + ttlDays * 24 * 60 * 60 * 1000).toISOString();
+  await db
+    .prepare(
+      "INSERT INTO proof_upload_tokens (token_hash, shop, order_id, created_at, expires_at, used_at) VALUES (?, ?, ?, ?, ?, NULL)"
+    )
+    .bind(await sha256Hex(token), shop, orderId, now, expires)
+    .run();
+  return { token, url: proofUploadUrl(shop, orderId, token), expires_at: expires };
+}
+
+export async function verifyProofUploadToken(db, { shop, orderId, token }) {
+  if (!token) return null;
+  const row = await db
+    .prepare("SELECT * FROM proof_upload_tokens WHERE token_hash = ?")
+    .bind(await sha256Hex(token))
+    .first();
+  if (!row) return null;
+  if (row.shop !== shop || row.order_id !== orderId) return null;
+  if (row.used_at) return null;
+  if (new Date(row.expires_at).getTime() < Date.now()) return null;
+  return row;
+}
+
+export async function consumeProofUploadToken(db, tokenHash) {
+  await db
+    .prepare("UPDATE proof_upload_tokens SET used_at = ? WHERE token_hash = ?")
+    .bind(new Date().toISOString(), tokenHash)
+    .run();
+}
+
+// Image proof uploaded through the one-time link. Mirrors
+// addPaymentProof: records the proof and moves a pending_payment order
+// to payment_submitted; extra proofs on payment_submitted are allowed.
+// transaction_id / amount_cny are optional here — the buyer may not
+// know them, and the seller reads the amount off the screenshot.
+export async function addImagePaymentProof(db, { orderId, paymentMethod, fileName, mimeType, fileSize, r2Key, transactionId, amountCny }) {
+  const order = await getOrder(db, orderId);
+  if (!order) return null;
+  if (order.status !== "pending_payment" && order.status !== "payment_submitted") {
+    const e = new Error(`order ${orderId} is already ${order.status}; cannot submit a payment proof`);
+    e.code = -32000;
+    throw e;
+  }
+  const wasPending = order.status === "pending_payment";
+  const now = new Date().toISOString();
+  const id = `proof_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  const insert = db
+    .prepare(
+      "INSERT INTO payment_proofs (id, order_id, payment_method, transaction_id, amount_cny, proof_type, r2_key, file_name, mime_type, file_size, created_at) VALUES (?, ?, ?, ?, ?, 'image', ?, ?, ?, ?, ?)"
+    )
+    .bind(id, orderId, paymentMethod, transactionId || null, amountCny ?? null, r2Key, fileName, mimeType, fileSize, now);
+  const note = `图片凭据 ${fileName}` + (transactionId ? ` · 单号 ${transactionId}` : "");
+  if (wasPending) {
+    const update = db
+      .prepare("UPDATE orders SET status = 'payment_submitted', updated_at = ? WHERE id = ?")
+      .bind(now, orderId);
+    const evt = writeEvent(db, { orderId, event: "payment_proof_submitted", fromStatus: "pending_payment", toStatus: "payment_submitted", actor: "buyer", note, now });
+    await db.batch([insert, update, evt]);
+  } else {
+    await insert.run();
+  }
+  return getOrder(db, orderId);
+}
+
 // Seller-side step: confirm receipt of the offline payment.
 // Preconditions: the order exists, its status is payment_submitted, it has
 // at least one proof, and verifiedAmountCny equals the order total.

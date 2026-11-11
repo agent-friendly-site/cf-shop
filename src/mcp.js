@@ -14,6 +14,10 @@
 // (/shops/:shop/admin/) is the authenticated path (API key per shop).
 // update_buyer_info fills in buyer info after create_order without
 // changing the order status (allowed until the order ships).
+// get_payment_proof_upload_link mints a one-time upload link so the
+// buyer can submit a payment screenshot directly to the platform (R2):
+// the image never goes through the agent, so the agent must NOT try to
+// read a transaction id out of a screenshot — hand the buyer the link.
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import * as db from "./db.js";
@@ -44,7 +48,7 @@ function publicProduct(p) {
 export function createMcpServer(env, shop) {
   const server = new McpServer({
     name: "agent-friendly-platform",
-    version: "1.5.0",
+    version: "1.6.0",
   });
 
   server.registerTool(
@@ -126,7 +130,7 @@ export function createMcpServer(env, shop) {
     {
       title: "Create order",
       description:
-        "Create an order. Requires idempotency_key. Order starts as pending_payment; payment is offline, instructions are returned with the order. shipping_address is REQUIRED: create_order rejects the call when it is missing or empty — the seller cannot ship without an address, so there is no way to create an order without one. Before calling create_order, ask the buyer for name, contact and shipping address at the confirmation step and pass them as buyer_name / buyer_contact (optional) and shipping_address (required). Ask first, create the order only after you have the address. Do NOT create the order first and ask afterwards. If the buyer refuses to give an address, explain the order cannot be created without one; a missing or wrong address can be fixed later with update_buyer_info (allowed until the order ships). After a successful create_order, send the buyer the payment instructions returned with the order (payment method + the seller's configured receiving account, verbatim) and wait for the buyer to pay offline and submit proof. Do NOT start tracking this order yet: tracking starts only after submit_payment_proof succeeds.",
+        "Create an order. Requires idempotency_key. Order starts as pending_payment; payment is offline, instructions are returned with the order. shipping_address is REQUIRED: create_order rejects the call when it is missing or empty — the seller cannot ship without an address, so there is no way to create an order without one. Before calling create_order, ask the buyer for name, contact and shipping address at the confirmation step and pass them as buyer_name / buyer_contact (optional) and shipping_address (required). Ask first, create the order only after you have the address. Do NOT create the order first and ask afterwards. If the buyer refuses to give an address, explain the order cannot be created without one; a missing or wrong address can be fixed later with update_buyer_info (allowed until the order ships). After a successful create_order, send the buyer the payment instructions returned with the order (payment method + the seller's configured receiving account, verbatim) and the proof-upload link returned with the order, and wait for the buyer to pay offline and submit proof. Proof has two paths: (a) the buyer sends a transaction id in chat — submit it with submit_payment_proof; (b) the buyer has a payment screenshot — do NOT try to read the transaction id out of it yourself, send the buyer the proof-upload link so they upload the screenshot directly to the platform. Do NOT start tracking this order yet: tracking starts only after a proof is submitted and the order becomes payment_submitted.",
       inputSchema: {
         items: z.array(ItemShape),
         idempotency_key: z.string(),
@@ -150,6 +154,7 @@ export function createMcpServer(env, shop) {
         shippingAddress: shipping_address,
       });
       const payment = await db.getPayment(env.DB, shop);
+      const link = await db.createProofUploadToken(env.DB, { shop, orderId: order.id });
       return text({
         order,
         payment: payment?.payment || {
@@ -157,9 +162,14 @@ export function createMcpServer(env, shop) {
           summary: "线下支付：确认订单后卖家提供收款方式，买家在 Agent 外付款，付款后提交付款凭据，卖家核验到账后发货。",
         },
         total_verbatim: t.verbatim,
-        next_step: "买家按卖家给的线下收款方式付款，然后用 submit_payment_proof 提交交易单号（或付款截图，由 Agent 从截图里读出交易单号再提交）。",
+        proof_upload: {
+          url: link.url,
+          expires_at: link.expires_at,
+          how: "把这个链接发给买家：买家在浏览器里打开，直接上传付款截图，图片直达平台，不经过你识别。链接一次有效，7 天内有效；用过或过期后用 get_payment_proof_upload_link 再取一个。",
+        },
+        next_step: "买家按卖家给的线下收款方式付款，然后提交付款凭据：有交易单号就直接发给你，你用 submit_payment_proof 提交；有付款截图就把 proof_upload.url 发给买家，让买家在浏览器里直接上传，图片不经过你识别。",
         tracking:
-          "先不要建跟踪任务：等买家提交付款凭据、submit_payment_proof 成功（订单变为 payment_submitted）之后，再为这个订单建跟踪任务：每 6 小时查一次 get_order，有变化就告诉买家，直到订单完成或取消；订单取消时一并删除跟踪任务。",
+          "先不要建跟踪任务：等买家提交付款凭据（submit_payment_proof 成功，或买家用上传链接传完截图，订单变为 payment_submitted）之后，再为这个订单建跟踪任务：每 6 小时查一次 get_order，有变化就告诉买家，直到订单完成或取消；订单取消时一并删除跟踪任务。",
       });
     }
   );
@@ -169,7 +179,7 @@ export function createMcpServer(env, shop) {
     {
       title: "Submit payment proof",
       description:
-        "Submit offline payment proof (transaction id) for an order. The order becomes payment_submitted (awaiting seller verification), NOT paid. The seller must then verify the actual receipt and amount with confirm_payment; only then does the order become paid and ship. After a successful submit_payment_proof, start tracking this order: check get_order every 6 hours and tell the buyer when the status changes, until it reaches completed or cancelled; if the order is cancelled, delete the tracking task. Never send the buyer's card numbers or verification codes.",
+        "Submit offline payment proof (transaction id) for an order. Use this only when the buyer sends a transaction id as text. If the buyer sends a payment screenshot instead, do NOT try to read the transaction id out of it — call get_payment_proof_upload_link and send the buyer the link so they upload the screenshot directly to the platform. The order becomes payment_submitted (awaiting seller verification), NOT paid. The seller must then verify the actual receipt and amount with confirm_payment; only then does the order become paid and ship. After a successful submit_payment_proof, start tracking this order: check get_order every 6 hours and tell the buyer when the status changes, until it reaches completed or cancelled; if the order is cancelled, delete the tracking task. Never send the buyer's card numbers or verification codes.",
       inputSchema: {
         order_id: z.string(),
         payment_method: z.string(),
@@ -193,6 +203,32 @@ export function createMcpServer(env, shop) {
         next_step: "Seller: check the actual receipt (bank / WeChat / Alipay) and amount, then call confirm_payment with verified_amount_cny equal to the order total.",
         tracking:
           "凭据已提交，现在为这个订单建跟踪任务：每 6 小时查一次 get_order，状态变了就主动告诉买家新状态是什么意思、下一步是什么；到 completed 或 cancelled 发一条结尾消息并删除跟踪任务，不再继续查。买家不用记订单号，直接问订单怎么样了就行。",
+      });
+    }
+  );
+
+  server.registerTool(
+    "get_payment_proof_upload_link",
+    {
+      title: "Get payment proof upload link",
+      description:
+        "Get a one-time upload link for the buyer to submit a payment screenshot directly to the platform. Use this whenever the buyer has a payment screenshot (or says they will send one) instead of a transaction id: do NOT try to read the transaction id out of the screenshot yourself — send the buyer this link and let them open it in a browser and upload the image. The image goes straight to the platform (R2 storage) and the order becomes payment_submitted; the seller verifies the screenshot visually in the admin UI. The link is single-use and expires in 7 days; if it is used or expired, call this tool again for a fresh link. After the buyer confirms the upload (or get_order shows payment_submitted), start tracking this order: check get_order every 6 hours and tell the buyer when the status changes, until it reaches completed or cancelled; if the order is cancelled, delete the tracking task.",
+      inputSchema: { order_id: z.string() },
+    },
+    async ({ order_id }) => {
+      const order = await db.getOrder(env.DB, order_id);
+      if (!order) throw new Error(`unknown order_id: ${order_id}`);
+      if (order.shop !== shop) throw new Error(`order ${order_id} does not belong to shop ${shop}`);
+      const link = await db.createProofUploadToken(env.DB, { shop, orderId: order_id });
+      return text({
+        order_id,
+        shop,
+        status: order.status,
+        upload_url: link.url,
+        expires_at: link.expires_at,
+        how: "把这个链接发给买家：买家在浏览器里打开，直接上传付款截图（JPG/PNG/WebP/GIF，5MB 以内），图片直达平台，不经过你识别。上传成功后订单变为 payment_submitted，卖家在后台看图核对金额后确认收款。",
+        tracking:
+          "买家传完截图、订单变为 payment_submitted 之后，再为这个订单建跟踪任务：每 6 小时查一次 get_order，有变化就告诉买家，直到订单完成或取消；订单取消时一并删除跟踪任务。",
       });
     }
   );

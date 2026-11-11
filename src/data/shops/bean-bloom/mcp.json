@@ -38,7 +38,7 @@
    },
    {
     "name": "create_order",
-    "description": "Create an order. Requires idempotency_key. Returns the order with payment instructions (offline payment). Status starts as pending_payment. shipping_address is REQUIRED — create_order rejects orders without it. Ask the buyer for name, contact and shipping address at the confirmation step (buyer_name / buyer_contact optional, shipping_address required) BEFORE create_order: ask first, create only after you have the address, never create first and ask afterwards. After create_order, send the buyer the payment instructions returned with the order (method + the seller's configured receiving account, verbatim) and wait for payment proof. Do NOT start tracking yet: tracking starts only after submit_payment_proof succeeds. 姓名、联系方式没给的可事后用 update_buyer_info 补填；收货地址是必填的，下单时必须有。",
+    "description": "Create an order. Requires idempotency_key. Returns the order with payment instructions (offline payment). Status starts as pending_payment. shipping_address is REQUIRED — create_order rejects orders without it. Ask the buyer for name, contact and shipping address at the confirmation step (buyer_name / buyer_contact optional, shipping_address required) BEFORE create_order: ask first, create only after you have the address, never create first and ask afterwards. After create_order, send the buyer the payment instructions returned with the order (method + the seller's configured receiving account, verbatim) and the proof-upload link returned with the order (proof_upload.url). Proof has two paths: a transaction id goes through submit_payment_proof; a payment screenshot goes through the upload link — the buyer uploads it directly in a browser, never ask the agent to read the transaction id out of a screenshot. Do NOT start tracking yet: tracking starts only after a proof is submitted and the order becomes payment_submitted. 姓名、联系方式没给的可事后用 update_buyer_info 补填；收货地址是必填的，下单时必须有。",
     "readOnlyHint": false,
     "input": {
      "items": "array of {product_id: string, quantity: integer}",
@@ -51,13 +51,21 @@
    },
    {
     "name": "submit_payment_proof",
-    "description": "Submit offline payment proof for an order: transaction id and payment method (if the buyer sends a screenshot of the transfer receipt, read the transaction id from it first). The order becomes payment_submitted (awaiting seller verification), NOT paid. The seller must then verify the actual receipt and amount with confirm_payment. After a successful call, start tracking the order (check get_order every 6 hours, notify on change, until completed or cancelled; delete the tracking task if the order is cancelled). Never ask the buyer for their own card numbers or verification codes.",
+    "description": "Submit offline payment proof for an order: transaction id and payment method. Use only when the buyer sends a transaction id as text. If the buyer sends a payment screenshot, do NOT read the transaction id out of it — use get_payment_proof_upload_link and send the buyer the link to upload the screenshot directly. The order becomes payment_submitted (awaiting seller verification), NOT paid. The seller must then verify the actual receipt and amount with confirm_payment. After a successful call, start tracking the order (check get_order every 6 hours, notify on change, until completed or cancelled; delete the tracking task if the order is cancelled). Never ask the buyer for their own card numbers or verification codes.",
     "readOnlyHint": false,
     "input": {
      "order_id": "string",
      "payment_method": "string",
      "transaction_id": "string",
      "amount_cny": "number"
+    }
+   },
+   {
+    "name": "get_payment_proof_upload_link",
+    "description": "Get a one-time upload link for the buyer to submit a payment screenshot directly to the platform. Use this whenever the buyer has a payment screenshot instead of a transaction id: do NOT read the transaction id out of the screenshot — send the buyer this link to upload the image in a browser. The image goes straight to the platform and the order becomes payment_submitted; the seller verifies the screenshot visually in the admin UI. Single-use, expires in 7 days; call again for a fresh link if used or expired. After the buyer uploads (order payment_submitted), start tracking the order (6-hour get_order checks).",
+    "readOnlyHint": false,
+    "input": {
+     "order_id": "string"
     }
    },
    {

@@ -138,3 +138,11 @@ GET/PUT /shops/:shop/admin/api/policies
 - guide.md 明确写了：买家事后补给收货信息时用这个工具，不要让买家重新下单；补填后用 get_order 核对。
 - v1.4.1 硬性规则（Hall 追加，2026-11-11）：下单前必须先问清收货信息。顺序是硬性的——先问、问清了再调 `create_order`，绝不能先下单、后补问；只有买家明确坚持不给（且已说明没有地址卖家没法发货）时才例外，之后用 `update_buyer_info` 补填。`guide.md` 流程 4（确认）和流程 7（下单前问收货信息）、`create_order` 的工具描述、`mcp.json` / `agent.json` 都改成了硬性表述。
 - v1.5.0 收货地址必填（Hall 决定，2026-11-11）：v1.4.1 的文字硬性规则在盲测里没卡住——新对话的 agent 被买家一句“直接下单，别问那么多”就直接下单了，收货信息全空。改成工具层面卡住：`create_order` 的 `shipping_address` 改为必填，MCP schema（`z.string().min(1)`）和 `db.createOrder` 两层校验，缺地址直接拒绝，没有例外；`buyer_name` / `buyer_contact` 仍可选，地址填错可用 `update_buyer_info` 在发货前改。
+
+## 十二、v1.6.0 上传链接交付款截图（2026-11-11，Hall 决定统一用链接方案）
+
+- 起因：买家在聊天里发付款截图时，agent 得先识别图片、读出交易单号再调 `submit_payment_proof`；Hall 问能不能绕过 agent 的识别、让买家直接交图，以及 MCP 有没有考虑这个场景。
+- 结论：MCP 核心协议没有图片/文件上传（工具只收 JSON）；逃生口是 elicitation URL 模式和 MCP Apps（App 可直接 fetch 上传接口或 base64 调工具），但客户端支持不齐。Muse 的 HTML 小部件也走不通——实测探针里 `fetch` 到两个域名都失败，iframe 没有外网访问能力。调研见 `~/workspace/research_notes/muse-html-widget-vs-mcp-apps-20261111/report.md`。
+- 统一方案（全客户端通用）：一次性上传链接。`create_order` 直接返回 `proof_upload.url`；新工具 `get_payment_proof_upload_link` 可随时再取一个。链接一次有效、7 天过期，D1 只存 token 的 SHA-256 哈希。买家在浏览器里打开链接上传截图（JPG/PNG/WebP/GIF，5MB 以内），图片直存私有 R2 桶 `agent-friendly-proofs`（Worker 绑定 `PROOFS`），订单变为 `payment_submitted`——agent 全程不读图。`submit_payment_proof` 只负责文字形式的交易单号；agent 收到截图时不许自己读单号，必须给链接。
+- 卖家侧：后台订单详情直接显示截图（仅限登录后的卖家，图片走鉴权接口，不公开）；买家没填金额时页面提示看图核对，在确认框里输入图上金额再确认收款，金额校验（必须等于订单总额）不变。
+- 实现：migration `0005`（`payment_proofs` 重建：`transaction_id` / `amount_cny` 改可空，新增 `proof_type` / `r2_key` / `file_name` / `mime_type` / `file_size`，16 条旧凭据原样保留；新增 `proof_upload_tokens` 表）；`src/proof_upload.js`（上传页 + multipart 上传接口）；`src/db.js`（token 发放/校验/核销、`addImagePaymentProof`）；`src/admin.js`（鉴权图片接口 + 详情页图片渲染 + 金额提示修正）；`cf.py` 新增 `r2-list` / `r2-create` 和 `--r2-binding`。

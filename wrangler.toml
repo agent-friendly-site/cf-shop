@@ -12,6 +12,13 @@ database_name = "agent-friendly-orders"
 database_id = "dd3c36b4-a260-4fc5-9da2-b9b06ccfb1cc"
 migrations_dir = "migrations"
 
+# Payment-proof screenshots (v1.6.0, one-time upload link): private R2
+# bucket, served only through the authenticated admin image endpoint.
+# cf.py worker-put needs --r2-binding PROOFS:agent-friendly-proofs.
+[[r2_buckets]]
+binding = "PROOFS"
+bucket_name = "agent-friendly-proofs"
+
 # Daily auto-complete of orders shipped 7+ days ago (see scheduled()
 # in src/index.js). Cron triggers are set via the Cloudflare API
 # (PUT /workers/scripts/{name}/schedules), not by wrangler deploy here.

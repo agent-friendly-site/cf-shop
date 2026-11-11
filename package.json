@@ -1,6 +1,6 @@
 {
   "name": "cf-shop",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "agent-friendly multi-merchant platform: one Hono Worker + D1 on Cloudflare. Agent-only storefronts at /shops/:shop/ with llms.txt discovery and a live MCP endpoint.",
   "directories": {
     "test": "tests"

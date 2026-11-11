@@ -140,6 +140,28 @@ export function registerAdminRoutes(app) {
     return json(c, { order: orderSummary(order) });
   });
 
+  // Proof image (v1.6.0): serve an image proof from private R2 storage.
+  // Admin-only: the buyer's upload link is NOT enough to view it, and
+  // the image is never served from a public URL.
+  app.get(`${api}/orders/:id/proofs/:proofId/image`, async (c) => {
+    const slug = c.req.param("shop");
+    if (!(await requireAdmin(c, slug))) return unauthorized(c);
+    const order = await db.getOrder(c.env.DB, c.req.param("id"));
+    if (!order || order.shop !== slug) return json(c, { error: "unknown order" }, 404);
+    const proof = (order.proofs || []).find((p) => p.id === c.req.param("proofId"));
+    if (!proof || proof.proof_type !== "image" || !proof.r2_key) {
+      return json(c, { error: "no image proof" }, 404);
+    }
+    const obj = await c.env.PROOFS.get(proof.r2_key);
+    if (!obj) return json(c, { error: "image not found" }, 404);
+    return new Response(obj.body, {
+      headers: {
+        "Content-Type": obj.httpMetadata?.contentType || proof.mime_type || "image/jpeg",
+        "Cache-Control": "private, max-age=3600",
+      },
+    });
+  });
+
   app.post(`${api}/orders/:id/confirm-payment`, async (c) => {
     const slug = c.req.param("shop");
     if (!(await requireAdmin(c, slug))) return unauthorized(c);
@@ -335,11 +357,22 @@ function setFilter(s){ CUR_STATUS = s; loadOrders(); }
 async function showOrder(id){
   var d = await api("/orders/" + id);
   var o = d.order;
-  var proofs = (o.proofs||[]).map(function(p){ return "<li>" + esc(p.payment_method) + " · 单号 " + esc(p.transaction_id) + " · " + p.amount_cny + " 元 · " + esc(p.created_at.slice(0,19).replace("T"," ")) + "</li>"; }).join("") || "<li>暂无</li>";
+  var proofs = (o.proofs||[]).map(function(p){
+    var when = esc((p.created_at||"").slice(0,19).replace("T"," "));
+    if (p.proof_type === "image") {
+      var img = "<br><img src='/shops/" + SHOP + "/admin/api/orders/" + o.id + "/proofs/" + p.id + "/image' style='max-width:100%;border:1px solid #ccc;border-radius:6px;margin-top:6px'>";
+      var amt = (p.amount_cny !== null && p.amount_cny !== undefined) ? (" · " + p.amount_cny + " 元") : " · 金额见图";
+      var txn = p.transaction_id ? (" · 单号 " + esc(p.transaction_id)) : "";
+      return "<li>图片凭据 · " + esc(p.payment_method) + txn + amt + " · " + esc(p.file_name||"") + " · " + when + img + "</li>";
+    }
+    return "<li>" + esc(p.payment_method) + " · 单号 " + esc(p.transaction_id) + " · " + p.amount_cny + " 元 · " + when + "</li>";
+  }).join("") || "<li>暂无</li>";
   var tl = (o.timeline||[]).map(function(t){ return "<li>" + esc(t.created_at.slice(0,19).replace("T"," ")) + " · " + esc(t.event) + (t.from_status?("（"+esc(t.from_status)+" → "+esc(t.to_status)+"）"):"") + " · " + esc(t.actor) + (t.note?(" · "+esc(t.note)):"") + "</li>"; }).join("") || "<li>暂无事件</li>";
   var mismatch = "";
-  var proofTotal = (o.proofs||[]).reduce(function(a,p){ return a + p.amount_cny; }, 0);
-  if (o.status === "payment_submitted" && proofTotal !== o.total_cny) mismatch = "<p class='bad'>注意：凭据金额 " + proofTotal + " 元与订单总额 " + o.total_cny + " 元不一致，确认前请先联系买家核对。</p>";
+  var amountProofs = (o.proofs||[]).filter(function(p){ return p.amount_cny !== null && p.amount_cny !== undefined; });
+  var proofTotal = amountProofs.reduce(function(a,p){ return a + p.amount_cny; }, 0);
+  if (o.status === "payment_submitted" && amountProofs.length > 0 && proofTotal !== o.total_cny) mismatch = "<p class='bad'>注意：凭据金额 " + proofTotal + " 元与订单总额 " + o.total_cny + " 元不一致，确认前请先联系买家核对。</p>";
+  else if (o.status === "payment_submitted" && amountProofs.length === 0) mismatch = "<p>图片凭据没有填写金额：请看图核对金额，在上面输入实际到账金额再确认收款。</p>";
   var html = "<div class='card'><h2>订单 " + esc(o.id) + " · " + STATUS_LABEL[o.status] + "</h2>"
     + "<p>总价 " + o.total_cny + " 元（商品 " + o.subtotal_cny + " + 运费 " + o.shipping_cny + "）</p>"
     + "<p>买家：" + esc(o.buyer_name||"—") + " · " + esc(o.buyer_contact||"—") + "<br>收货地址：" + esc(o.shipping_address||"—") + "</p>"

@@ -263,6 +263,27 @@ order without an address at all; `buyer_name` / `buyer_contact`
 stay optional, and a wrong address can still be fixed later with
 `update_buyer_info` before shipping.
 
+v1.6.0 (same day, Hall's decision — unified upload-link proof):
+payment proof has one unified path for screenshots. MCP has no
+first-class image upload, and a Muse HTML widget cannot reach the
+network (verified by a probe widget: fetch to two hosts failed), so
+the buyer submits a screenshot through a one-time upload link
+instead of through the agent. `create_order` returns
+`proof_upload.url` with the order, and the new MCP tool
+`get_payment_proof_upload_link` (13 tools total) mints a fresh one:
+single-use, 7-day expiry, only the SHA-256 hash stored in D1. The
+buyer opens the link in a browser and uploads the screenshot
+(JPG/PNG/WebP/GIF, 5MB); the image goes straight to private R2
+storage (`agent-friendly-proofs`, binding `PROOFS`) and the order
+becomes `payment_submitted` — the agent never reads the image and
+must NOT try to extract a transaction id from a screenshot. The
+seller sees the image in the admin order detail (served only
+through the authenticated admin image endpoint) and confirms with
+the amount read off the screenshot. `submit_payment_proof` is now
+for transaction ids sent as text only. Migration `0005` adds
+`proof_type` / R2 columns to `payment_proofs` (existing proofs
+kept) and the `proof_upload_tokens` table.
+
 ## Migration notes (from GitHub Pages + agent-friendly-mcp)
 
 - The old deployment was split: static JSON on GitHub Pages

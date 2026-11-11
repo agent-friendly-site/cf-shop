@@ -60,6 +60,10 @@ def main():
                     "-d", json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"})],
                    capture_output=True)
     rpc("tools/list")
+    res = rpc("tools/list")
+    names = [t["name"] for t in res["result"]["tools"]]
+    print(f"\nTOOLS ({len(names)}): {names}")
+    assert len(names) == 13 and "get_payment_proof_upload_link" in names, f"expected 13 tools incl. get_payment_proof_upload_link, got: {names}"
     rpc("ping")
     tool("list_products", {})
     tool("get_product", {"product_id": "tp-mug-300"})
@@ -142,8 +146,12 @@ def main():
     res = tool("create_order", {"items": [{"product_id": "tp-plate-20", "quantity": 1}],
                                 "idempotency_key": key2,
                                 "shipping_address": "测试省测试市测试路 1 号"})
-    order2 = json.loads(res["result"]["content"][0]["text"])["order"]
+    created2 = json.loads(res["result"]["content"][0]["text"])
+    order2 = created2["order"]
     assert order2["buyer_name"] is None and order2["shipping_address"].endswith("1 号"), "expected address-only order"
+    # create_order returns a proof-upload link with the order (v1.6.0).
+    assert "/upload-proof?token=" in created2.get("proof_upload", {}).get("url", ""), f"expected proof_upload.url, got: {created2.get('proof_upload')}"
+    print(f"\nPROOF UPLOAD LINK FROM CREATE_ORDER: {created2['proof_upload']['url'][:90]}...")
     # No fields at all must fail.
     res = tool("update_buyer_info", {"order_id": order2["id"]})
     assert res.get("result", {}).get("isError") is True, f"expected update_buyer_info with no fields to fail, got: {res}"
@@ -157,10 +165,58 @@ def main():
     assert updated["status"] == "pending_payment", "update must not change status"
     assert [e["event"] for e in updated["timeline"]] == ["order_created", "buyer_info_updated"], f"unexpected timeline: {[e['event'] for e in updated['timeline']]}"
     print("BUYER_INFO_UPDATED EVENT RECORDED")
+    # v1.6.0: one-time proof upload link. The buyer uploads a payment
+    # screenshot directly; the agent never reads the image.
+    res = tool("get_payment_proof_upload_link", {"order_id": order2["id"]})
+    link = json.loads(res["result"]["content"][0]["text"])
+    assert "/upload-proof?token=" in link["upload_url"], f"expected upload_url, got: {link}"
+    assert link["status"] == "pending_payment", f"expected pending_payment, got: {link['status']}"
+    print(f"\nUPLOAD LINK: {link['upload_url'][:90]}... expires {link['expires_at']}")
+    # A 1x1 PNG as the payment screenshot, uploaded via multipart POST.
+    import base64
+    png = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
+    with open("/tmp/test-proof.png", "wb") as f:
+        f.write(png)
+    out = subprocess.run(
+        ["curl", "-sS", "--max-time", "30", "-X", "POST", link["upload_url"],
+         "-H", f"User-Agent: {UA}",
+         "-F", "payment_method=wechat_pay",
+         "-F", f"transaction_id=test-txn-{uuid.uuid4().hex[:8]}",
+         "-F", "file=@/tmp/test-proof.png;type=image/png"],
+        capture_output=True, text=True)
+    assert out.returncode == 0, f"upload curl failed: {out.stderr}"
+    assert "付款截图已提交" in out.stdout, f"expected upload success page, got: {out.stdout[:500]}"
+    print("\nUPLOAD SUCCESS PAGE RETURNED")
+    after = json.loads(tool("get_order", {"order_id": order2["id"]})["result"]["content"][0]["text"])["order"]
+    assert after["status"] == "payment_submitted", f"expected payment_submitted after image upload, got: {after['status']}"
+    assert len(after["proofs"]) == 1 and after["proofs"][0]["proof_type"] == "image", f"expected one image proof, got: {after['proofs']}"
+    assert after["proofs"][0]["r2_key"].startswith("proofs/terra-pots/"), f"expected R2 key, got: {after['proofs'][0]}"
+    assert [e["event"] for e in after["timeline"]] == ["order_created", "buyer_info_updated", "payment_proof_submitted"], f"unexpected timeline: {[e['event'] for e in after['timeline']]}"
+    print(f"IMAGE PROOF RECORDED: {after['proofs'][0]['r2_key']}  STATUS: {after['status']}")
+    # The same link is single-use: a second upload must be refused.
+    out = subprocess.run(
+        ["curl", "-sS", "--max-time", "30", "-X", "POST", link["upload_url"],
+         "-H", f"User-Agent: {UA}",
+         "-F", "payment_method=wechat_pay",
+         "-F", "file=@/tmp/test-proof.png;type=image/png"],
+        capture_output=True, text=True)
+    assert "链接无效" in out.stdout, f"expected reused link to be refused, got: {out.stdout[:300]}"
+    print("REUSED UPLOAD LINK REFUSED")
+    # A forged token must be refused too.
+    bad = link["upload_url"].rsplit("token=", 1)[0] + "token=" + "0" * 64
+    out = subprocess.run(
+        ["curl", "-sS", "--max-time", "30", bad, "-H", f"User-Agent: {UA}"],
+        capture_output=True, text=True)
+    assert "链接无效" in out.stdout, f"expected forged token to be refused, got: {out.stdout[:300]}"
+    print("FORGED UPLOAD TOKEN REFUSED")
+    # get_payment_proof_upload_link on a cancelled order must fail.
     res = tool("cancel_order", {"order_id": order2["id"], "reason": "test: buyer changed mind"})
     cancelled = json.loads(res["result"]["content"][0]["text"])["order"]
     print(f"\nCANCELLED ORDER: {cancelled['id']}  STATUS: {cancelled['status']}")
     assert cancelled["status"] == "cancelled", "expected cancelled"
+    res = tool("get_payment_proof_upload_link", {"order_id": order2["id"]})
+    assert res.get("result", {}).get("isError") is True, f"expected upload link on cancelled order to fail, got: {res}"
+    print("UPLOAD LINK ON CANCELLED ORDER REJECTED")
     print("\nE2E PASS")
 
 

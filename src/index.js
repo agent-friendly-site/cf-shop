@@ -13,6 +13,8 @@
 //     api/presentation.json)
 //   - live MCP: POST /shops/:shop/mcp (Streamable HTTP, protocol 2025-06-18)
 //   - order events: GET /shops/:shop/api/orders/:id/events (public timeline)
+//   - payment-proof upload link: GET/POST /shops/:shop/orders/:id/upload-proof
+//     (one-time token, image straight to R2, no agent-side recognition)
 //   - seller admin: /shops/:shop/admin/ (web UI + JSON API, per-shop key)
 //   - daily scheduled job: auto-complete orders shipped 7+ days ago
 //
@@ -26,11 +28,12 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { createMcpServer } from "./mcp.js";
 import { registerAdminRoutes } from "./admin.js";
+import { registerProofUploadRoutes } from "./proof_upload.js";
 import * as db from "./db.js";
 import { dataFile } from "./data.js";
 
 const BASE = "https://agent-friendly-platform.refined-x.workers.dev";
-const VERSION = "1.5.0";
+const VERSION = "1.6.0";
 
 const app = new Hono();
 
@@ -277,6 +280,9 @@ app.get("/shops/:shop/api/orders/:id/events", async (c) => {
   const events = await db.listOrderEvents(c.env.DB, order.id);
   return json(c, { shop: slug, order_id: order.id, status: order.status, events });
 });
+
+// --- payment-proof upload link: one-time token, image straight to R2 ---
+registerProofUploadRoutes(app);
 
 // --- seller admin: web UI + JSON API (API-key auth, see src/admin.js) ---
 registerAdminRoutes(app);

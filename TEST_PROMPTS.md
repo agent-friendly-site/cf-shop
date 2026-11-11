@@ -1,4 +1,4 @@
-# Test prompts — order tracking + seller admin (v1.5.0)
+# Test prompts — order tracking + seller admin (v1.6.0)
 
 Consumer-voice prompts for the new order lifecycle. Each prompt is
 self-contained: paste it to a fresh agent with only the shop URL.
@@ -98,6 +98,20 @@ the buyer refuses to give an address, the agent explains the order
 cannot be created without one and does not place the order.
 (v1.5.0 tool-level requirement.)
 
+## 26. 发付款截图，不用把单号打出来
+
+> 帮我去陶土这家店买个马克杯，预算 300 以内。我付完款直接发你付款截图，不想一个个字打交易单号。
+
+Expected: the agent must NOT ask the buyer to type out the transaction
+id, and must NOT try to read it out of the screenshot itself. After
+create_order it sends the payment methods AND the proof-upload link
+(proof_upload.url from the create_order result, or
+get_payment_proof_upload_link for a fresh one). The buyer opens the
+link in a browser and uploads the screenshot; the image goes straight
+to the platform and the order becomes payment_submitted without the
+agent ever reading the image. Tracking starts only after
+payment_submitted. (v1.6.0 upload link.)
+
 ## Seller admin checklist (manual — the admin is a web UI, not an agent flow)
 
 Hall (or a shop owner) opens the admin with the shop's key:
@@ -109,8 +123,12 @@ Hall (or a shop owner) opens the admin with the shop's key:
 3. Open a payment_submitted order: proofs and timeline are visible;
    confirm-payment shows the proof amount next to the order total and
    blocks on a mismatch (try 100 against a 140 order).
-4. Confirm with the exact total → paid. Mark shipped with a carrier
+4. Image proofs (v1.6.0): open a payment_submitted order with an image
+   proof — the screenshot is visible in the order detail. If the buyer
+   left the amount blank, the page says to read the amount off the
+   screenshot; confirm with the amount read from the image → paid.
+5. Confirm with the exact total → paid. Mark shipped with a carrier
    and tracking number → shipped.
-5. Products: change a price or stock, save, then check the shop's
+6. Products: change a price or stock, save, then check the shop's
    api/products.json shows the new value; restore it afterwards.
-6. Policies: change the flat shipping fee, save, check policies.json.
+7. Policies: change the flat shipping fee, save, check policies.json.
