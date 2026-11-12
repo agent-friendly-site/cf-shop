@@ -230,12 +230,23 @@ def main():
     assert order3.get("payment_expires_at"), "expected payment_expires_at on a pending_payment order"
     print(f"\nORDER3: {order3['id']}  EXPIRES AT: {order3['payment_expires_at']}")
     # Backdate the order 20 minutes so the per-minute sweep picks it up.
-    import subprocess as _sp
-    cf = ["python3", "/home/hatch/workspace/custom-connectors/custom.cloudflare/bin/cf.py",
-          "d1-query", "b74b5f1383b4c12d7d98a26b462e7c22", "dd3c36b4-a260-4fc5-9da2-b9b06ccfb1cc"]
-    sql = f"UPDATE orders SET created_at = datetime('now', '-20 minutes') WHERE id = '{order3['id']}'"
-    out = _sp.run(cf + [sql], capture_output=True, text=True)
-    assert out.returncode == 0 and json.loads(out.stdout).get("success") is True, f"backdate failed: {out.stdout[:300]} {out.stderr[:300]}"
+    # Use wrangler (Mac/WSL/CI); do not depend on the legacy hatch cf.py path.
+    oid = order3["id"]
+    assert oid.replace("_", "").isalnum(), f"unexpected order id: {oid}"
+    sql = f"UPDATE orders SET created_at = datetime('now', '-20 minutes') WHERE id = '{oid}'"
+    out = subprocess.run(
+        ["npx", "wrangler", "d1", "execute", "agent-friendly-orders",
+         "--remote", "--json", "--command", sql],
+        capture_output=True, text=True)
+    assert out.returncode == 0, f"backdate failed: {out.stdout[:300]} {out.stderr[:300]}"
+    try:
+        payload = json.loads(out.stdout)
+    except json.JSONDecodeError as e:
+        raise AssertionError(f"backdate: non-JSON wrangler output: {out.stdout[:300]}") from e
+    # wrangler --json returns a list of statement results, or a single object.
+    results = payload if isinstance(payload, list) else [payload]
+    assert results and all(r.get("success") is True for r in results), (
+        f"backdate failed: {out.stdout[:300]} {out.stderr[:300]}")
     print("ORDER3 BACKDATED 20 MINUTES")
     # The per-minute cron sweep should cancel it within ~60s; poll up to 120s.
     import time as _time
