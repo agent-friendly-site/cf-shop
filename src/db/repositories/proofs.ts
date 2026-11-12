@@ -1,33 +1,30 @@
-import {
-  assertCanConfirmPayment,
-  assertCanSubmitProof,
-  canSubmitProof,
-  matchProofUploadToken,
-} from "../../domain/payment";
-import { DomainRpcError, PROOF_UPLOAD_TTL_DAYS, sha256Hex, writeEvent } from "../shared";
-import { getOrder, transitionOrder } from "./orders";
+/**
+ * Payment-proof data access (Phase 3.x harden).
+ * Token/proof SQL only. Domain rules live in services/payments.ts.
+ */
+import type { UploadTokenRow } from "../../domain/payment";
+import { sha256Hex, writeEvent } from "../shared";
 
 export function proofUploadUrl(shop: string, orderId: string, token: string): string {
   return `https://agent-friendly-platform.refined-x.workers.dev/shops/${shop}/orders/${orderId}/upload-proof?token=${token}`;
 }
 
-export async function addPaymentProof(
+export async function insertTextPaymentProof(
   db: D1Database,
   {
     orderId,
     paymentMethod,
     transactionId,
     amountCny,
-  }: { orderId: string; paymentMethod: string; transactionId: string; amountCny: number },
-) {
-  const order = await getOrder(db, orderId);
-  if (!order) return null;
-  // Submitting a proof never marks the order paid. It records the proof and
-  // moves the order to payment_submitted (awaiting seller verification).
-  // A proof on an already-paid (or later) order is rejected: the payment
-  // is already verified and must not be re-opened by a new proof.
-  assertCanSubmitProof(orderId, order.status);
-  const wasPending = order.status === "pending_payment";
+    wasPending,
+  }: {
+    orderId: string;
+    paymentMethod: string;
+    transactionId: string;
+    amountCny: number;
+    wasPending: boolean;
+  },
+): Promise<void> {
   const now = new Date().toISOString();
   const id = `proof_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   const insert = db
@@ -52,73 +49,9 @@ export async function addPaymentProof(
   } else {
     await insert.run();
   }
-  return getOrder(db, orderId);
 }
 
-export async function createProofUploadToken(
-  db: D1Database,
-  {
-    shop,
-    orderId,
-    ttlDays = PROOF_UPLOAD_TTL_DAYS,
-  }: { shop: string; orderId: string; ttlDays?: number },
-) {
-  const order = await getOrder(db, orderId);
-  if (!order) {
-    throw new DomainRpcError(`unknown order_id: ${orderId}`, -32602);
-  }
-  if (order.shop !== shop) {
-    throw new DomainRpcError(`order ${orderId} does not belong to shop ${shop}`, -32602);
-  }
-  if (!canSubmitProof(order.status)) {
-    throw new DomainRpcError(
-      `order ${orderId} is ${order.status}; a payment proof can no longer be uploaded`,
-      -32000,
-    );
-  }
-  // A fresh token on every call: only the hash is stored, so an earlier
-  // token cannot be reconstructed. Earlier unused tokens stay valid
-  // until they expire or are used; that is harmless.
-  const bytes = new Uint8Array(32);
-  crypto.getRandomValues(bytes);
-  const token = [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
-  const now = new Date().toISOString();
-  const expires = new Date(Date.now() + ttlDays * 24 * 60 * 60 * 1000).toISOString();
-  await db
-    .prepare(
-      "INSERT INTO proof_upload_tokens (token_hash, shop, order_id, created_at, expires_at, used_at) VALUES (?, ?, ?, ?, ?, NULL)",
-    )
-    .bind(await sha256Hex(token), shop, orderId, now, expires)
-    .run();
-  return { token, url: proofUploadUrl(shop, orderId, token), expires_at: expires };
-}
-
-export async function verifyProofUploadToken(
-  db: D1Database,
-  { shop, orderId, token }: { shop: string; orderId: string; token: string },
-) {
-  if (!token) return null;
-  const row = (await db
-    .prepare("SELECT * FROM proof_upload_tokens WHERE token_hash = ?")
-    .bind(await sha256Hex(token))
-    .first()) as {
-    shop: string;
-    order_id: string;
-    used_at: string | null;
-    expires_at: string;
-    token_hash: string;
-  } | null;
-  return matchProofUploadToken(row, { shop, orderId });
-}
-
-export async function consumeProofUploadToken(db: D1Database, tokenHash: string): Promise<void> {
-  await db
-    .prepare("UPDATE proof_upload_tokens SET used_at = ? WHERE token_hash = ?")
-    .bind(new Date().toISOString(), tokenHash)
-    .run();
-}
-
-export async function addImagePaymentProof(
+export async function insertImagePaymentProof(
   db: D1Database,
   {
     orderId,
@@ -129,6 +62,7 @@ export async function addImagePaymentProof(
     r2Key,
     transactionId,
     amountCny,
+    wasPending,
   }: {
     orderId: string;
     paymentMethod: string;
@@ -138,12 +72,9 @@ export async function addImagePaymentProof(
     r2Key: string;
     transactionId: string | null;
     amountCny: number | null;
+    wasPending: boolean;
   },
-) {
-  const order = await getOrder(db, orderId);
-  if (!order) return null;
-  assertCanSubmitProof(orderId, order.status);
-  const wasPending = order.status === "pending_payment";
+): Promise<void> {
   const now = new Date().toISOString();
   const id = `proof_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   const insert = db
@@ -180,26 +111,39 @@ export async function addImagePaymentProof(
   } else {
     await insert.run();
   }
-  return getOrder(db, orderId);
 }
 
-export async function confirmPayment(
+export async function insertProofUploadToken(
   db: D1Database,
   {
+    tokenHash,
+    shop,
     orderId,
-    verifiedAmountCny,
-    note,
-  }: { orderId: string; verifiedAmountCny: number; note?: string },
-) {
-  const order = await getOrder(db, orderId);
-  if (!order) {
-    throw new DomainRpcError(`unknown order_id: ${orderId}`, -32602);
-  }
-  assertCanConfirmPayment(order, verifiedAmountCny);
-  const now = new Date().toISOString();
-  return transitionOrder(db, order, "paid", "payment_confirmed", "seller", note || null, {
-    verified_amount_cny: verifiedAmountCny,
-    verified_at: now,
-    verification_note: note || null,
-  });
+    now,
+    expires,
+  }: { tokenHash: string; shop: string; orderId: string; now: string; expires: string },
+): Promise<void> {
+  await db
+    .prepare(
+      "INSERT INTO proof_upload_tokens (token_hash, shop, order_id, created_at, expires_at, used_at) VALUES (?, ?, ?, ?, ?, NULL)",
+    )
+    .bind(tokenHash, shop, orderId, now, expires)
+    .run();
+}
+
+export async function findProofUploadTokenRow(
+  db: D1Database,
+  token: string,
+): Promise<UploadTokenRow | null> {
+  return (await db
+    .prepare("SELECT * FROM proof_upload_tokens WHERE token_hash = ?")
+    .bind(await sha256Hex(token))
+    .first()) as UploadTokenRow | null;
+}
+
+export async function markProofUploadTokenUsed(db: D1Database, tokenHash: string): Promise<void> {
+  await db
+    .prepare("UPDATE proof_upload_tokens SET used_at = ? WHERE token_hash = ?")
+    .bind(new Date().toISOString(), tokenHash)
+    .run();
 }

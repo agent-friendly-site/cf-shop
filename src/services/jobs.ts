@@ -1,5 +1,5 @@
 /**
- * Scheduled jobs (Phase 3.4).
- * expireUnpaidOrders / autoCompleteShipped — locally testable via Vitest + D1.
+ * Scheduled jobs (Phase 3.x harden).
+ * Locally testable via Vitest + D1; orchestration lives in orders service.
  */
-export { autoCompleteShipped, expireUnpaidOrders } from "../db/repositories/orders";
+export { autoCompleteShipped, expireUnpaidOrders } from "./orders";

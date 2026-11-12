@@ -1,2 +1,5 @@
-/** Shipping service (Phase 3.3) — mark shipped / confirm receipt. */
-export { confirmReceipt, markShipped } from "../db/repositories/orders";
+/**
+ * Shipping service (Phase 3.x harden).
+ * mark_shipped / confirm_receipt orchestration lives in orders service.
+ */
+export { confirmReceipt, markShipped } from "./orders";

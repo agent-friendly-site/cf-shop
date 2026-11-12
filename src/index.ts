@@ -31,9 +31,11 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { registerAdminRoutes } from "./admin";
 import { dataFile } from "./data";
 import * as db from "./db";
+import { AUTO_COMPLETE_AFTER_DAYS, UNPAID_EXPIRY_MINUTES } from "./domain/constants";
 import type { Env } from "./env";
 import { createMcpServer } from "./mcp";
 import { registerProofUploadRoutes } from "./proof_upload";
+import * as jobs from "./services/jobs";
 
 const BASE = "https://agent-friendly-platform.refined-x.workers.dev";
 const VERSION = "1.7.0";
@@ -341,9 +343,9 @@ app.notFound((c) => notFound(c, `not found: ${c.req.path}`));
 // the old daily 02:00 trigger was replaced by the every-minute one;
 // the auto-complete query is cheap and usually finds nothing.
 async function scheduledJobs(env: Env) {
-  const expired = await db.expireUnpaidOrders(env.DB, db.UNPAID_EXPIRY_MINUTES);
+  const expired = await jobs.expireUnpaidOrders(env.DB, UNPAID_EXPIRY_MINUTES);
   console.log(`expire-unpaid: ${expired.length} orders auto-cancelled`, expired);
-  const done = await db.autoCompleteShipped(env.DB, db.AUTO_COMPLETE_AFTER_DAYS);
+  const done = await jobs.autoCompleteShipped(env.DB, AUTO_COMPLETE_AFTER_DAYS);
   console.log(`auto-complete: ${done.length} orders completed`, done);
   return { expired, done };
 }

@@ -34,16 +34,21 @@ npm run seed -- --local  # 从 src/data 同步到本地 D1（--remote 写生产�
 ```
 src/
   index.ts         入口：全部路由 + scheduled()
-  db.ts            数据访问 + 业务逻辑（正在拆——见重构计划）
-  mcp.ts           13 个 MCP 工具
-  admin.ts         后台 API + 后台页面（ADMIN_HTML 模板字符串，正在拆）
+  domain/          纯规则：状态机、金额、凭据、错误、常量
+  services/        业务编排（orders/payments/admin/catalog/jobs/shipping）
+  db/
+    schema.ts      Drizzle schema（迁移事实）
+    repositories/  纯数据访问（SQL）；禁止放业务规则
+    index.ts       兼容门面：re-export services（Phase 4 前过渡用）
+  mcp.ts           13 个 MCP 工具（Phase 4 拆到 mcp/）
+  admin.ts         后台 API + ADMIN_HTML（Phase 5 迁 HonoX）
   proof_upload.ts  上传页 + 上传接口
   data.ts          生成的静态文件 import map（别手改，用 scripts/gen_data_module.py 生成）
   env.ts           Env 类型（DB / PROOFS）
   data/            店铺事实：商品、价格、政策、guide、mcp.json 等（改事实只改这里）
 drizzle/           D1 migrations（drizzle-kit；旧 0001–0005 在 migrations/archive/）
-tests/             Python 线上 E2E
-scripts/           Python 运维脚本（seed、生成 key、改店铺事实）
+tests/             Vitest 本地 + Python 线上 E2E
+scripts/           seed / 运维脚本
 spike-honox/       Phase 0 HonoX spike（独立 Worker，不进生产路径）
 wrangler.toml      绑定（D1、R2）和触发器
 biome.json         Biome lint/format
@@ -55,20 +60,26 @@ tsconfig.json      TypeScript strict
 1. **对外契约不动**：路由、MCP 工具名/参数、店铺文件路径、订单状态机、
    价格/政策/时限（15 分钟、7 天）——改之前先确认，不许“顺手优化”。
 2. **重构 commit 不混行为改动**：一个 commit 只做一件事；行为改动单独 commit。
-3. **改店铺事实只改 `src/data/`**，再跑同步脚本写 D1；不要直接改 D1 里的商品数据。
-4. **不要把密钥、token、后台 key 明文写进仓库、记忆或代码**。
+3. **分层调用（Phase 3.x 起强制）**：
+   - `routes` / `mcp` / `admin` / `proof_upload` → 只调 `services/*`
+   - `services/*` → 可调 `domain/*` + `db/repositories/*`
+   - **禁止**接入层 `import` repositories；**禁止** repository 里写状态机/金额校验
+   - 过渡期 `import * as db from "./db"` 仍可用（门面转调 services），Phase 4 逐个拆掉
+   - 边界错误：服务抛 `DomainError`；HTTP 用 `toHttpError`，MCP 用 `toMcpError`
+4. **改店铺事实只改 `src/data/`**，再跑同步脚本写 D1；不要直接改 D1 里的商品数据。
+5. **不要把密钥、token、后台 key 明文写进仓库、记忆或代码**。
    后台 key 只给过 Hall 一次，丢了就重新生成，不要为了测试去轮换他的 key。
-5. **D1 里的订单全是测试单**，交易单号全是测试号；不要当成真实订单。
-6. **前端页面改动必须真机验证**：`npx tsc --noEmit` 通过后，再用浏览器
+6. **D1 里的订单全是测试单**，交易单号全是测试号；不要当成真实订单。
+7. **前端页面改动必须真机验证**：`npx tsc --noEmit` 通过后，再用浏览器
    实际点一遍（登录、主流程、一个失败分支）。只测 API 不算验证通过。
    前端走 HonoX（React 岛 + Tailwind + shadcn/ui），见 `docs/refactor-plan.md`
    §2.1–§2.2、§5.4：岛之间不许互相 import，`honox-island { display: contents; }`
    不许删，React 岛与 hono/jsx 岛不混写。
-7. **声称完成前先线上验证**：部署后读线上实际返回（/health、工具列表、
+8. **声称完成前先线上验证**：部署后读线上实际返回（/health、工具列表、
    店铺文件），不要只凭本地构建成功就汇报。Pages/部署有同步延迟，
    没刷出来就明说，不要硬说成功了。
-8. **测试先行**：改订单流、金额、时限这类逻辑，先跑 `tests/test_client.py`；
-   改后台先跑 `tests/test_admin.py`；新行为要补测试 prompt 到 `TEST_PROMPTS.md`。
+9. **测试先行**：改订单流、金额、时限这类逻辑，先跑 `npm test`；
+   改后台再补 `tests/test_admin.py`；新行为要补测试 prompt 到 `TEST_PROMPTS.md`。
 
 ## 部署
 
@@ -120,8 +131,9 @@ tsconfig.json      TypeScript strict
 
 - v1.7.0 已上线：15 分钟未付款自动取消、上传链接交截图、卖家核验、
   跟踪 + 后台管理。全部功能见 `README.md` 的版本记录。
-- 进行中：`docs/refactor-plan.md` 的 v2.0 重构。**Phase 0–3 已完成**
- （地基、Drizzle、domain/services）。下一步 Phase 4 接入层（routes + MCP）。
+- 重构：`docs/refactor-plan.md`。**Phase 0–3 完成**；**Phase 3.x 收口已做**
+  （services 编排上提、分层调用规矩写入本文、admin/MCP 示范路径接 DomainError 翻译）。
+  **下一步 Phase 4**（接入层：routes + MCP 全量改调 services，拆文件）。
   前端已定 HonoX 0.1.62（pin 死）+ React 渲染器 + Tailwind v4 + shadcn/ui；
   只接后台和上传页，API/MCP 不迁文件路由。接手时先读计划，按阶段做，不要跳阶段。
   注：`@cloudflare/vitest-pool-workers` 已更名为 `@cloudflare/vitest-plugin`，Phase 1.5 用后者。

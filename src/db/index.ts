@@ -1,6 +1,7 @@
-// D1 data access for agent-friendly-platform.
-// Phase 2.2: god module split into repositories by aggregate.
-// Callers keep `import * as db from "./db"` — public signatures unchanged.
+// Compatibility facade for agent-friendly-platform.
+// Phase 3.x: orchestration lives in services/; repositories are data access.
+// Callers may keep `import * as db from "./db"` until Phase 4 switches them
+// to `services/*`. Public signatures are unchanged.
 
 export {
   createAdminSession,
@@ -11,7 +12,7 @@ export {
   updatePolicies,
   updateProduct,
   verifyAdminKey,
-} from "./repositories/admin";
+} from "../services/admin";
 
 export {
   getPayment,
@@ -21,7 +22,7 @@ export {
   getShop,
   listProducts,
   listShops,
-} from "./repositories/catalog";
+} from "../services/catalog";
 
 export {
   autoCompleteShipped,
@@ -38,7 +39,7 @@ export {
   totals,
   transitionOrder,
   updateBuyerInfo,
-} from "./repositories/orders";
+} from "../services/orders";
 
 export {
   addImagePaymentProof,
@@ -48,7 +49,8 @@ export {
   createProofUploadToken,
   proofUploadUrl,
   verifyProofUploadToken,
-} from "./repositories/proofs";
+} from "../services/payments";
+
 export {
   AUTO_COMPLETE_AFTER_DAYS,
   DomainError,

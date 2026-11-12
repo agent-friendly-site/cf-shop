@@ -9,7 +9,11 @@ import type { Context, Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { Order, ShopPolicies } from "./db";
 import * as db from "./db";
+import { toHttpError } from "./domain/errors";
 import type { Env } from "./env";
+import * as adminService from "./services/admin";
+import * as orderService from "./services/orders";
+import * as paymentService from "./services/payments";
 
 type AppEnv = { Bindings: Env };
 type AppContext = Context<AppEnv>;
@@ -28,8 +32,13 @@ function parseCookies(c: AppContext): Record<string, string> {
   return out;
 }
 
-function errMessage(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
+/**
+ * Translate DomainError via toHttpError, but keep the legacy admin JSON
+ * shape `{ error: string }` so ADMIN_HTML keeps working until Phase 5.
+ */
+function adminCatch(c: AppContext, e: unknown) {
+  const mapped = toHttpError(e);
+  return json(c, { error: mapped.body.error.message }, mapped.status as ContentfulStatusCode);
 }
 
 async function requireAdmin(c: AppContext, shop: string) {
@@ -181,54 +190,54 @@ export function registerAdminRoutes(app: Hono<AppEnv>) {
   app.post(`${api}/orders/:id/confirm-payment`, async (c) => {
     const slug = c.req.param("shop");
     if (!(await requireAdmin(c, slug))) return unauthorized(c);
-    const order = await db.getOrder(c.env.DB, c.req.param("id"));
+    const order = await orderService.getOrder(c.env.DB, c.req.param("id"));
     if (!order || order.shop !== slug) return json(c, { error: "unknown order" }, 404);
     const { verified_amount_cny, note } = await body(c);
     try {
-      const done = await db.confirmPayment(c.env.DB, {
+      const done = await paymentService.confirmPayment(c.env.DB, {
         orderId: order.id,
         verifiedAmountCny: Number(verified_amount_cny),
         note: typeof note === "string" ? note : undefined,
       });
       return json(c, { order: done ? orderSummary(done) : null });
     } catch (e) {
-      return json(c, { error: errMessage(e) }, 400);
+      return adminCatch(c, e);
     }
   });
 
   app.post(`${api}/orders/:id/mark-shipped`, async (c) => {
     const slug = c.req.param("shop");
     if (!(await requireAdmin(c, slug))) return unauthorized(c);
-    const order = await db.getOrder(c.env.DB, c.req.param("id"));
+    const order = await orderService.getOrder(c.env.DB, c.req.param("id"));
     if (!order || order.shop !== slug) return json(c, { error: "unknown order" }, 404);
     const { carrier, tracking_number } = await body(c);
     try {
-      const done = await db.markShipped(c.env.DB, {
+      const done = await orderService.markShipped(c.env.DB, {
         orderId: order.id,
         carrier: typeof carrier === "string" ? carrier : undefined,
         trackingNumber: typeof tracking_number === "string" ? tracking_number : undefined,
       });
       return json(c, { order: done ? orderSummary(done) : null });
     } catch (e) {
-      return json(c, { error: errMessage(e) }, 400);
+      return adminCatch(c, e);
     }
   });
 
   app.post(`${api}/orders/:id/cancel`, async (c) => {
     const slug = c.req.param("shop");
     if (!(await requireAdmin(c, slug))) return unauthorized(c);
-    const order = await db.getOrder(c.env.DB, c.req.param("id"));
+    const order = await orderService.getOrder(c.env.DB, c.req.param("id"));
     if (!order || order.shop !== slug) return json(c, { error: "unknown order" }, 404);
     const { reason } = await body(c);
     try {
-      const done = await db.cancelOrder(c.env.DB, {
+      const done = await orderService.cancelOrder(c.env.DB, {
         orderId: order.id,
         reason: typeof reason === "string" ? reason : undefined,
         actor: "seller",
       });
       return json(c, { order: done ? orderSummary(done) : null });
     } catch (e) {
-      return json(c, { error: errMessage(e) }, 400);
+      return adminCatch(c, e);
     }
   });
 
@@ -244,13 +253,13 @@ export function registerAdminRoutes(app: Hono<AppEnv>) {
     if (!(await requireAdmin(c, slug))) return unauthorized(c);
     const { price_cny, stock } = await body(c);
     try {
-      const p = await db.updateProduct(c.env.DB, slug, c.req.param("id"), {
+      const p = await adminService.updateProduct(c.env.DB, slug, c.req.param("id"), {
         price: typeof price_cny === "number" ? price_cny : Number(price_cny),
         stock: typeof stock === "number" ? stock : Number(stock),
       });
       return json(c, { product: p });
     } catch (e) {
-      return json(c, { error: errMessage(e) }, 400);
+      return adminCatch(c, e);
     }
   });
 
@@ -267,10 +276,10 @@ export function registerAdminRoutes(app: Hono<AppEnv>) {
     if (!(await requireAdmin(c, slug))) return unauthorized(c);
     const patch = await body(c);
     try {
-      const pol = await db.updatePolicies(c.env.DB, slug, patch);
+      const pol = await adminService.updatePolicies(c.env.DB, slug, patch);
       let payment = await db.getPayment(c.env.DB, slug);
       if (patch.payment_methods) {
-        payment = await db.updatePaymentMethods(
+        payment = await adminService.updatePaymentMethods(
           c.env.DB,
           slug,
           patch.payment_methods as { id: string; instructions: string }[],
@@ -278,7 +287,7 @@ export function registerAdminRoutes(app: Hono<AppEnv>) {
       }
       return json(c, { shop: slug, policies: policyShape(pol), payment: payment?.payment || null });
     } catch (e) {
-      return json(c, { error: errMessage(e) }, 400);
+      return adminCatch(c, e);
     }
   });
 }

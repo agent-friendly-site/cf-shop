@@ -1,4 +1,8 @@
-import { DomainRpcError, sha256Hex } from "../shared";
+/**
+ * Admin data access (Phase 3.x harden).
+ * Key/session SQL + product/policy/payment updates (validation in services/admin).
+ */
+import { sha256Hex } from "../shared";
 import { getPayment, getPolicies, getProduct } from "./catalog";
 
 export async function setAdminKey(db: D1Database, shop: string, keyHash: string): Promise<void> {
@@ -62,89 +66,45 @@ export async function deleteAdminSession(db: D1Database, token: string): Promise
     .run();
 }
 
-export async function updateProduct(
+export async function persistProductUpdate(
   db: D1Database,
   shop: string,
   id: string,
-  { price, stock }: { price?: number; stock?: number },
+  sets: string[],
+  params: unknown[],
 ) {
-  const p = await getProduct(db, shop, id);
-  if (!p) {
-    throw new DomainRpcError(`unknown product_id: ${id}`, -32602);
-  }
-  const sets: string[] = [];
-  const params: unknown[] = [];
-  if (price !== undefined) {
-    if (typeof price !== "number" || price < 0) {
-      throw new DomainRpcError("price_cny must be a non-negative number", -32602);
-    }
-    sets.push("price = ?");
-    params.push(price);
-  }
-  if (stock !== undefined) {
-    if (!Number.isInteger(stock) || stock < 0) {
-      throw new DomainRpcError("stock must be a non-negative integer", -32602);
-    }
-    sets.push("stock = ?");
-    params.push(stock);
-  }
-  if (sets.length === 0) {
-    throw new DomainRpcError("nothing to update: send price_cny and/or stock", -32602);
-  }
-  params.push(shop, id);
   await db
     .prepare(`UPDATE products SET ${sets.join(", ")} WHERE shop = ? AND id = ?`)
-    .bind(...params)
+    .bind(...params, shop, id)
     .run();
   return getProduct(db, shop, id);
 }
 
-export async function updatePolicies(db: D1Database, shop: string, patch: Record<string, unknown>) {
-  const pol = await getPolicies(db, shop);
-  if (!pol) {
-    throw new DomainRpcError(`unknown shop: ${shop}`, -32602);
-  }
-  const map = {
-    shipping_flat_cny: "shipping_flat_cny",
-    free_over_cny: "free_over_cny",
-    lead_time: "lead_time",
-    returns_window_days: "returns_window_days",
-    returns_condition: "returns_condition",
-    return_shipping: "return_shipping",
-    privacy: "privacy",
-  };
-  const sets: string[] = [];
-  const params: unknown[] = [];
-  for (const [key, col] of Object.entries(map)) {
-    if (patch[key] !== undefined) {
-      sets.push(`${col} = ?`);
-      params.push(patch[key]);
-    }
-  }
+export async function persistPoliciesUpdate(
+  db: D1Database,
+  shop: string,
+  sets: string[],
+  params: unknown[],
+) {
   if (sets.length > 0) {
-    params.push(shop);
     await db
       .prepare(`UPDATE shop_policies SET ${sets.join(", ")} WHERE shop = ?`)
-      .bind(...params)
+      .bind(...params, shop)
       .run();
   }
   return getPolicies(db, shop);
 }
 
-export async function updatePaymentMethods(
+export async function persistPaymentMethodInstructions(
   db: D1Database,
   shop: string,
-  methods: { id: string; instructions: string }[] | undefined,
+  methodId: string,
+  instructions: string,
 ) {
-  // methods: [{id, instructions}] — only instructions are editable.
-  for (const m of methods || []) {
-    if (!m.id || typeof m.instructions !== "string") {
-      throw new DomainRpcError("each payment method needs id and instructions", -32602);
-    }
-    await db
-      .prepare("UPDATE payment_methods SET instructions = ? WHERE shop = ? AND method_id = ?")
-      .bind(m.instructions, shop, m.id)
-      .run();
-  }
-  return getPayment(db, shop);
+  await db
+    .prepare("UPDATE payment_methods SET instructions = ? WHERE shop = ? AND method_id = ?")
+    .bind(instructions, shop, methodId)
+    .run();
 }
+
+export { getPayment, getPolicies, getProduct };

@@ -26,7 +26,10 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { Product } from "./db";
 import * as db from "./db";
+import { toMcpError } from "./domain/errors";
 import type { Env } from "./env";
+import * as orderService from "./services/orders";
+import * as paymentService from "./services/payments";
 
 const ItemShape = z.object({
   product_id: z.string(),
@@ -146,44 +149,51 @@ export function createMcpServer(env: Env, shop: string) {
       },
     },
     async ({ items, idempotency_key, buyer_note, buyer_name, buyer_contact, shipping_address }) => {
-      const products = await db.listProducts(env.DB, shop);
-      const t = db.totals(items || [], products);
-      const { order } = await db.createOrder(env.DB, {
-        shop,
-        items,
-        total: t,
-        idempotencyKey: idempotency_key,
-        buyerNote: buyer_note,
-        buyerName: buyer_name,
-        buyerContact: buyer_contact,
-        shippingAddress: shipping_address,
-      });
-      const payment = await db.getPayment(env.DB, shop);
-      if (!order) throw new Error("create_order failed: order is null");
-      const link = await db.createProofUploadToken(env.DB, { shop, orderId: order.id });
-      return mcpText({
-        order,
-        payment: payment?.payment || {
-          method: "offline",
-          summary:
-            "线下支付：确认订单后卖家提供收款方式，买家在 Agent 外付款，付款后提交付款凭据，卖家核验到账后发货。",
-        },
-        total_verbatim: t.verbatim,
-        payment_deadline: {
-          minutes: db.UNPAID_EXPIRY_MINUTES,
-          expires_at: order.payment_expires_at,
-          note: "请在 15 分钟内付款并提交凭据，超时订单自动取消；交了凭据就不会过期。",
-        },
-        proof_upload: {
-          url: link.url,
-          expires_at: link.expires_at,
-          how: "把这个链接发给买家：买家在浏览器里打开，直接上传付款截图，图片直达平台，不经过你识别。链接一次有效，7 天内有效；用过或过期后用 get_payment_proof_upload_link 再取一个。",
-        },
-        next_step:
-          "买家按卖家给的线下收款方式付款，然后提交付款凭据：有交易单号就直接发给你，你用 submit_payment_proof 提交；有付款截图就把 proof_upload.url 发给买家，让买家在浏览器里直接上传，图片不经过你识别。",
-        tracking:
-          "先不要建跟踪任务：等买家提交付款凭据（submit_payment_proof 成功，或买家用上传链接传完截图，订单变为 payment_submitted）之后，再为这个订单建跟踪任务：每 6 小时查一次 get_order，有变化就告诉买家，直到订单完成或取消；订单取消时一并删除跟踪任务。",
-      });
+      try {
+        const products = await db.listProducts(env.DB, shop);
+        const t = orderService.totals(items || [], products);
+        const { order } = await orderService.createOrder(env.DB, {
+          shop,
+          items,
+          total: t,
+          idempotencyKey: idempotency_key,
+          buyerNote: buyer_note,
+          buyerName: buyer_name,
+          buyerContact: buyer_contact,
+          shippingAddress: shipping_address,
+        });
+        const payment = await db.getPayment(env.DB, shop);
+        if (!order) throw new Error("create_order failed: order is null");
+        const link = await paymentService.createProofUploadToken(env.DB, {
+          shop,
+          orderId: order.id,
+        });
+        return mcpText({
+          order,
+          payment: payment?.payment || {
+            method: "offline",
+            summary:
+              "线下支付：确认订单后卖家提供收款方式，买家在 Agent 外付款，付款后提交付款凭据，卖家核验到账后发货。",
+          },
+          total_verbatim: t.verbatim,
+          payment_deadline: {
+            minutes: db.UNPAID_EXPIRY_MINUTES,
+            expires_at: order.payment_expires_at,
+            note: "请在 15 分钟内付款并提交凭据，超时订单自动取消；交了凭据就不会过期。",
+          },
+          proof_upload: {
+            url: link.url,
+            expires_at: link.expires_at,
+            how: "把这个链接发给买家：买家在浏览器里打开，直接上传付款截图，图片直达平台，不经过你识别。链接一次有效，7 天内有效；用过或过期后用 get_payment_proof_upload_link 再取一个。",
+          },
+          next_step:
+            "买家按卖家给的线下收款方式付款，然后提交付款凭据：有交易单号就直接发给你，你用 submit_payment_proof 提交；有付款截图就把 proof_upload.url 发给买家，让买家在浏览器里直接上传，图片不经过你识别。",
+          tracking:
+            "先不要建跟踪任务：等买家提交付款凭据（submit_payment_proof 成功，或买家用上传链接传完截图，订单变为 payment_submitted）之后，再为这个订单建跟踪任务：每 6 小时查一次 get_order，有变化就告诉买家，直到订单完成或取消；订单取消时一并删除跟踪任务。",
+        });
+      } catch (e) {
+        return toMcpError(e);
+      }
     },
   );
 
@@ -260,15 +270,19 @@ export function createMcpServer(env: Env, shop: string) {
       },
     },
     async ({ order_id, verified_amount_cny, note }) => {
-      const order = await db.confirmPayment(env.DB, {
-        orderId: order_id,
-        verifiedAmountCny: verified_amount_cny,
-        note,
-      });
-      return mcpText({
-        order,
-        verification: `Seller confirmed receipt of ${verified_amount_cny} CNY for order ${order_id}; order is now paid and can ship.`,
-      });
+      try {
+        const order = await paymentService.confirmPayment(env.DB, {
+          orderId: order_id,
+          verifiedAmountCny: verified_amount_cny,
+          note,
+        });
+        return mcpText({
+          order,
+          verification: `Seller confirmed receipt of ${verified_amount_cny} CNY for order ${order_id}; order is now paid and can ship.`,
+        });
+      } catch (e) {
+        return toMcpError(e);
+      }
     },
   );
 

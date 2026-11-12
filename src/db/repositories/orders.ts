@@ -1,27 +1,18 @@
-import { totals as computeTotals, type OrderTotals } from "../../domain/money";
-import { assertCanTransition, canUpdateBuyerInfo, paymentExpiresAt } from "../../domain/order";
+/**
+ * Order data access (Phase 3.x harden).
+ * Reads + low-level writes only. Domain rules and orchestration live in services/orders.ts.
+ */
+import { paymentExpiresAt } from "../../domain/order";
 import {
-  AUTO_COMPLETE_AFTER_DAYS,
-  DomainRpcError,
   ORDER_STATUSES,
   type Order,
   type OrderEvent,
-  type OrderItemInput,
   type OrderRow,
   type OrderStatus,
   type PaymentProof,
-  type Product,
   rows,
-  UNPAID_EXPIRY_MINUTES,
   writeEvent,
 } from "../shared";
-
-export type { OrderTotals };
-
-/** Re-export domain totals so existing `db.totals` callers stay unchanged. */
-export function totals(items: OrderItemInput[], products: Product[]): OrderTotals {
-  return computeTotals(items, products);
-}
 
 function orderShape(row: OrderRow, proofs: PaymentProof[], timeline: OrderEvent[]): Order {
   return {
@@ -46,7 +37,6 @@ function orderShape(row: OrderRow, proofs: PaymentProof[], timeline: OrderEvent[
     verified_amount_cny: row.verified_amount_cny ?? null,
     verified_at: row.verified_at ?? null,
     verification_note: row.verification_note ?? null,
-    // Payment deadline (v1.7.0): only pending_payment orders have one.
     payment_expires_at: paymentExpiresAt(row.created_at, row.status),
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -121,7 +111,81 @@ export async function orderCounts(db: D1Database, shop: string) {
   return { ...counts, total };
 }
 
-export async function transitionOrder(
+export async function findOrderIdByIdempotencyKey(
+  db: D1Database,
+  idempotencyKey: string,
+): Promise<string | null> {
+  const existing = (await db
+    .prepare("SELECT id FROM orders WHERE idempotency_key = ?")
+    .bind(idempotencyKey)
+    .first()) as { id: string } | null;
+  return existing?.id ?? null;
+}
+
+export async function insertOrderRow(
+  db: D1Database,
+  {
+    id,
+    shop,
+    itemsJson,
+    subtotalCny,
+    shippingCny,
+    totalCny,
+    idempotencyKey,
+    buyerNote,
+    buyerName,
+    buyerContact,
+    shippingAddress,
+    now,
+  }: {
+    id: string;
+    shop: string;
+    itemsJson: string;
+    subtotalCny: number;
+    shippingCny: number;
+    totalCny: number;
+    idempotencyKey: string;
+    buyerNote: string | null;
+    buyerName: string | null;
+    buyerContact: string | null;
+    shippingAddress: string;
+    now: string;
+  },
+): Promise<void> {
+  await db
+    .prepare(
+      "INSERT INTO orders (id, shop, items_json, subtotal_cny, shipping_cny, total_cny, status, idempotency_key, buyer_note, buyer_name, buyer_contact, shipping_address, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(
+      id,
+      shop,
+      itemsJson,
+      subtotalCny,
+      shippingCny,
+      totalCny,
+      "pending_payment",
+      idempotencyKey,
+      buyerNote,
+      buyerName,
+      buyerContact,
+      shippingAddress,
+      now,
+      now,
+    )
+    .run();
+  await writeEvent(db, {
+    orderId: id,
+    event: "order_created",
+    fromStatus: null,
+    toStatus: "pending_payment",
+    actor: "buyer",
+    note: null,
+    now,
+  }).run();
+}
+
+/** Persist a status change + timeline event. Caller must validate the transition. */
+export async function persistTransition(
   db: D1Database,
   order: Order,
   toStatus: OrderStatus,
@@ -131,7 +195,6 @@ export async function transitionOrder(
   extra: Record<string, unknown> = {},
 ): Promise<Order | null> {
   const from = order.status;
-  assertCanTransition(order.id, from, toStatus);
   const now = new Date().toISOString();
   const sets = ["status = ?", "updated_at = ?"];
   const params: unknown[] = [toStatus, now];
@@ -154,164 +217,18 @@ export async function transitionOrder(
   return getOrder(db, order.id);
 }
 
-export async function createOrder(
+export async function persistBuyerInfoUpdate(
   db: D1Database,
   {
-    shop,
-    total,
-    idempotencyKey,
-    buyerNote,
-    buyerName,
-    buyerContact,
-    shippingAddress,
-  }: {
-    shop: string;
-    items: OrderItemInput[];
-    total: OrderTotals;
-    idempotencyKey: string;
-    buyerNote?: string;
-    buyerName?: string;
-    buyerContact?: string;
-    shippingAddress?: string;
-  },
-) {
-  // The shipping address is required at the tool level (v1.5.0): the
-  // seller cannot ship without one, so an order without an address
-  // cannot be created at all. The MCP schema enforces this first;
-  // this check is the second gate for any direct caller.
-  if (typeof shippingAddress !== "string" || !shippingAddress.trim()) {
-    throw new DomainRpcError(
-      "shipping_address is required: the seller cannot ship without an address",
-      -32602,
-    );
-  }
-  shippingAddress = shippingAddress.trim();
-  const existing = (await db
-    .prepare("SELECT id FROM orders WHERE idempotency_key = ?")
-    .bind(idempotencyKey)
-    .first()) as {
-    id: string;
-  } | null;
-  if (existing) return { existing: true, order: await getOrder(db, existing.id) };
-  const now = new Date().toISOString();
-  const id = `ord_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-  await db
-    .prepare(
-      "INSERT INTO orders (id, shop, items_json, subtotal_cny, shipping_cny, total_cny, status, idempotency_key, buyer_note, buyer_name, buyer_contact, shipping_address, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    )
-    .bind(
-      id,
-      shop,
-      JSON.stringify(total.lines),
-      total.subtotal_cny,
-      total.shipping_cny,
-      total.total_cny,
-      "pending_payment",
-      idempotencyKey,
-      buyerNote || null,
-      buyerName || null,
-      buyerContact || null,
-      shippingAddress || null,
-      now,
-      now,
-    )
-    .run();
-  await writeEvent(db, {
-    orderId: id,
-    event: "order_created",
-    fromStatus: null,
-    toStatus: "pending_payment",
-    actor: "buyer",
-    note: null,
+    order,
+    fields,
     now,
-  }).run();
-  return { existing: false, order: await getOrder(db, id) };
-}
-
-export async function markShipped(
-  db: D1Database,
-  {
-    orderId,
-    carrier,
-    trackingNumber,
-  }: { orderId: string; carrier?: string; trackingNumber?: string },
-) {
-  const order = await getOrder(db, orderId);
-  if (!order) {
-    throw new DomainRpcError(`unknown order_id: ${orderId}`, -32602);
-  }
-  const now = new Date().toISOString();
-  const note = [carrier, trackingNumber].filter(Boolean).join(" ") || null;
-  return transitionOrder(db, order, "shipped", "shipped", "seller", note, {
-    carrier: carrier || null,
-    tracking_number: trackingNumber || null,
-    shipped_at: now,
-  });
-}
-
-export async function confirmReceipt(db: D1Database, { orderId }: { orderId: string }) {
-  const order = await getOrder(db, orderId);
-  if (!order) {
-    throw new DomainRpcError(`unknown order_id: ${orderId}`, -32602);
-  }
-  const now = new Date().toISOString();
-  return transitionOrder(db, order, "completed", "receipt_confirmed", "buyer", null, {
-    completed_at: now,
-  });
-}
-
-export async function cancelOrder(
-  db: D1Database,
-  { orderId, reason, actor = "buyer" }: { orderId: string; reason?: string; actor?: string },
-) {
-  const order = await getOrder(db, orderId);
-  if (!order) {
-    throw new DomainRpcError(`unknown order_id: ${orderId}`, -32602);
-  }
-  const now = new Date().toISOString();
-  return transitionOrder(db, order, "cancelled", "cancelled", actor, reason || null, {
-    cancelled_at: now,
-    cancel_reason: reason || null,
-  });
-}
-
-export async function updateBuyerInfo(
-  db: D1Database,
-  {
-    orderId,
-    buyerName,
-    buyerContact,
-    shippingAddress,
-  }: { orderId: string; buyerName?: string; buyerContact?: string; shippingAddress?: string },
-) {
-  const order = await getOrder(db, orderId);
-  if (!order) {
-    throw new DomainRpcError(`unknown order_id: ${orderId}`, -32602);
-  }
-  if (!canUpdateBuyerInfo(order.status)) {
-    throw new DomainRpcError(
-      `order ${orderId} is ${order.status}; buyer info can no longer be changed`,
-      -32000,
-    );
-  }
-  const fields: { col: string; val: string; label: string }[] = [];
-  const check = (value: string | undefined, col: string, label: string) => {
-    if (value === undefined) return;
-    if (typeof value !== "string" || !value.trim()) {
-      throw new DomainRpcError(`${col} must be a non-empty string`, -32602);
-    }
-    fields.push({ col, val: value.trim(), label });
-  };
-  check(buyerName, "buyer_name", "姓名");
-  check(buyerContact, "buyer_contact", "联系方式");
-  check(shippingAddress, "shipping_address", "收货地址");
-  if (fields.length === 0) {
-    throw new DomainRpcError(
-      "at least one of buyer_name, buyer_contact, shipping_address is required",
-      -32602,
-    );
-  }
-  const now = new Date().toISOString();
+  }: {
+    order: Order;
+    fields: { col: string; val: string; label: string }[];
+    now: string;
+  },
+): Promise<Order | null> {
   const sets = ["updated_at = ?"];
   const params: unknown[] = [now];
   for (const f of fields) {
@@ -333,58 +250,26 @@ export async function updateBuyerInfo(
   return getOrder(db, order.id);
 }
 
-export async function expireUnpaidOrders(
+export async function listStaleUnpaidOrderIds(
   db: D1Database,
-  minutes = UNPAID_EXPIRY_MINUTES,
+  cutoffIso: string,
 ): Promise<string[]> {
-  const cutoff = new Date(Date.now() - minutes * 60 * 1000).toISOString();
-  const stale = await rows<OrderRow>(
-    db,
-    "SELECT * FROM orders WHERE status = 'pending_payment' AND created_at < ? ORDER BY created_at",
-    cutoff,
-  );
-  const cancelled: string[] = [];
-  for (const row of stale) {
-    const order = await getOrder(db, row.id);
-    if (!order) continue;
-    const now = new Date().toISOString();
-    const reason = `下单 ${minutes} 分钟未付款，自动取消`;
-    const done = await transitionOrder(db, order, "cancelled", "auto_cancelled", "system", reason, {
-      cancelled_at: now,
-      cancel_reason: reason,
-    });
-    if (done) cancelled.push(done.id);
-  }
-  return cancelled;
-}
-
-export async function autoCompleteShipped(
-  db: D1Database,
-  days = AUTO_COMPLETE_AFTER_DAYS,
-): Promise<string[]> {
-  const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
   const stale = await rows<{ id: string }>(
     db,
-    "SELECT * FROM orders WHERE status = 'shipped' AND shipped_at IS NOT NULL AND shipped_at < ? ORDER BY shipped_at",
-    cutoff,
+    "SELECT id FROM orders WHERE status = 'pending_payment' AND created_at < ? ORDER BY created_at",
+    cutoffIso,
   );
-  const completed: string[] = [];
-  for (const row of stale) {
-    const order = await getOrder(db, row.id);
-    if (!order) continue;
-    const now = new Date().toISOString();
-    const done = await transitionOrder(
-      db,
-      order,
-      "completed",
-      "auto_completed",
-      "system",
-      `发货满 ${days} 天未确认收货，自动完成`,
-      {
-        completed_at: now,
-      },
-    );
-    if (done) completed.push(done.id);
-  }
-  return completed;
+  return stale.map((r) => r.id);
+}
+
+export async function listStaleShippedOrderIds(
+  db: D1Database,
+  cutoffIso: string,
+): Promise<string[]> {
+  const stale = await rows<{ id: string }>(
+    db,
+    "SELECT id FROM orders WHERE status = 'shipped' AND shipped_at IS NOT NULL AND shipped_at < ? ORDER BY shipped_at",
+    cutoffIso,
+  );
+  return stale.map((r) => r.id);
 }

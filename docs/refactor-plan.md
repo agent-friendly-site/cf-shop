@@ -1,6 +1,9 @@
 # 重构计划 — agent-friendly-platform v2.0（Hono + TS）
 
-> 状态：**Phase 0–3 已完成（2026-11-11）**。下一步 Phase 4（接入层：routes + MCP）。
+> 状态：**Phase 0–3 已完成；Phase 3.x 收口已完成（2026-11-12）**。下一步 Phase 4（接入层：routes + MCP）。
+> Phase 3.x 收口：services 承接编排（不再是 re-export 桶）、repositories 收成 SQL、
+> AGENTS.md 写入分层调用规矩、admin 订单写路径 + MCP `create_order`/`confirm_payment`
+> 示范接入 `toHttpError`/`toMcpError`。Drizzle 查询层与 Python 脚本清理仍留给后续阶段。
 > 本文是重构的需求文档；Phase 0 结论见 §2.2 末尾。执行时每个阶段都要能独立部署、
 > 独立验证；重构不改变任何对外行为，除非本文件明确写出。业务规则见附录 A
 > （重构期间这些规则一个字都不动）。
