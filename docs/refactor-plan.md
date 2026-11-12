@@ -378,10 +378,16 @@ scripts/
 
 ### 4.5 Phase 5 — 前端重写（HonoX，两个页面，见 §5）
 
+切流（feature flag、默认可回退）：见 `docs/phase5-ui-cutover.md`。
+Agent 执行清单：`.cursor/skills/phase5-admin-upload/SKILL.md`。
+**5.3 仅在默认已切 `honox` 且真机签字后做**；之前保留 `ADMIN_HTML` / `page()` 并由 `UI_MODE` 分支。
+
 | #   | 任务                                                                                                                                                                            | 验收                                                                              |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| 5.1 | 上传页：`app/routes/shops/[shop]/orders/[id]/upload-proof.tsx`（SSR 壳）+ `app/islands/upload/proof-form.tsx`（倒计时、文件预览、提交）+ 共用 `_renderer.tsx` / `app/style.css` | §5 的验收清单全过；真机浏览器测试通过                                             |
+| 5.0 | `UI_MODE` + `?ui=` / cookie 覆盖；GET 后台/上传按 mode 双轨；默认 `legacy`                                                                                                       | 默认行为与现网一致；`?ui=honox` 可看新页；去掉参数即回旧页                         |
+| 5.1 | 上传页：`app/routes/shops/[shop]/orders/[id]/upload-proof.tsx`（SSR 壳）+ `app/islands/upload/proof-form.tsx`（倒计时、文件预览、提交）+ 共用 `_renderer.tsx` / `app/style.css` | §5 的验收清单全过；真机浏览器测试通过（先 `?ui=honox`）                           |
 | 5.2 | 后台页：`app/routes/shops/[shop]/admin.tsx`（SSR 壳）+ `app/islands/admin/` 四个岛（列表、详情、商品编辑、政策编辑）+ shadcn/ui 组件                                            | §5 的验收清单全过；真机浏览器测试通过（含登录失败、确认收款金额不符、发货、取消） |
+| 5.2b| 默认切 `UI_MODE=honox`（单独 commit + deploy）；观察完整卖家流程                                                                                                                | 无需 query 即新 UI；出问题改回 `legacy` 可恢复                                    |
 | 5.3 | 删掉 `ADMIN_HTML` 模板字符串和 `page()` HTML 拼接；全仓 grep 确认没有残留的 HTML 模板字符串；同时删掉 `src/ui/`、`src/client/` 占位（如果 Phase 1–4 建过的话，以 `app/` 为准）  | `grep -r "ADMIN_HTML\|<!doctype" src/ app/` 零命中（测试除外）                    |
 | 5.4 | 旧 Python 测试退役：`tests/test_client.py` / `test_admin.py` 改为仅上线后冒烟（或由 `tests/smoke.ts` 替代）；`compare_routes.py` 保留为比对工具直到 4.4 完成，之后可删          | `npm test` 不再依赖线上；冒烟脚本单独命令                                         |
 | 5.5 | HonoX 回归：岛之间无互相 import（grep 检查）、`honox-island { display: contents; }` 在样式里、React 岛与 hono/jsx 岛不混写                                                      | 静态检查全过；Phase 0 spike 的验收项在完整版上重跑一遍                            |

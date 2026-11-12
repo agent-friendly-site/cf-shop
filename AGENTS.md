@@ -54,10 +54,22 @@ biome.json         Biome lint/format
 tsconfig.json      TypeScript strict
 ```
 
+## Skills（仓库内工作流）
+
+可重复流程写在 `.cursor/skills/`，动手前按任务读对应 `SKILL.md`：
+
+| Skill | 何时用 |
+| --- | --- |
+| `deploy-verify` | 构建部署、线上冒烟、回滚 |
+| `parity-check` | 店铺路由/MCP/后台 API 契约比对 |
+| `phase5-admin-upload` | Phase 5 后台+上传页（含 flag 切流） |
+
+Phase 5 切流方案（默认可回退）：`docs/phase5-ui-cutover.md`。
+
 ## 规矩
 
 1. **对外契约不动**：路由、MCP 工具名/参数、店铺文件路径、订单状态机、
-   价格/政策/时限（15 分钟、7 天）——改之前先确认，不许“顺手优化”。
+ 价格/政策/时限（15 分钟、7 天）——改之前先确认，不许“顺手优化”。
 2. **重构 commit 不混行为改动**：一个 commit 只做一件事；行为改动单独 commit。
 3. **分层调用（Phase 3.x 起强制）**：
    - `routes` / `mcp` / `admin` / `proof_upload` → 只调 `services/*`
@@ -136,6 +148,7 @@ tsconfig.json      TypeScript strict
   `scripts/gen-data.ts` → `src/static/data.ts`。
   **下一步 Phase 5**（HonoX 重写后台页 + 上传页；删 ADMIN_HTML）。
   前端已定 HonoX 0.1.62（pin 死）+ React 渲染器 + Tailwind v4 + shadcn/ui；
-  只接后台和上传页，API/MCP 不迁文件路由。接手时先读计划，按阶段做，不要跳阶段。
+  只接后台和上传页，API/MCP 不迁文件路由。接手时先读计划 + `docs/phase5-ui-cutover.md`
+  + skill `phase5-admin-upload`，按阶段做，不要跳阶段；**未切默认 honox 并真机签字前不许删旧 HTML**。
 - 待 Hall 手动做的事：关 GitHub Pages；部署后 `compare_routes.py` + TEST_PROMPTS
-  关键路径；Phase 5 真机点后台/上传页。
+  关键路径；Phase 5 真机点后台/上传页（先 `?ui=honox`）。
