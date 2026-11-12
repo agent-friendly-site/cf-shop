@@ -3,7 +3,7 @@
  */
 import type { Hono } from "hono";
 import * as catalog from "../services/catalog";
-import { dataFile } from "../data";
+import { dataFile } from "../static/data";
 import {
   type AppContext,
   type AppEnv,

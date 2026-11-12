@@ -2,7 +2,7 @@ import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { Env } from "../env";
 import * as catalog from "../services/catalog";
-import { dataFile } from "../data";
+import { dataFile } from "../static/data";
 
 export const BASE = "https://agent-friendly-platform.refined-x.workers.dev";
 export const VERSION = "1.7.0";

@@ -161,7 +161,7 @@ the documented text fixes) and regenerate the bundled data module:
 
 ```sh
 python3 scripts/import_data.py
-python3 scripts/gen_data_module.py
+npm run gen-data   # writes src/static/data.ts
 ```
 
 ## Deploy

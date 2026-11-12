@@ -7,7 +7,7 @@
   },
   "scripts": {
     "import-data": "python3 scripts/import_data.py",
-    "gen-data": "python3 scripts/gen_data_module.py",
+    "gen-data": "npx tsx scripts/gen-data.ts",
     "seed": "npx tsx scripts/seed.ts",
     "seed:py": "python3 scripts/seed.py",
     "build": "node scripts/build.mjs",

@@ -1,7 +1,6 @@
 // Compatibility facade for agent-friendly-platform.
-// Phase 3.x: orchestration lives in services/; repositories are data access.
-// Callers may keep `import * as db from "./db"` until Phase 4 switches them
-// to `services/*`. Public signatures are unchanged.
+// Phase 4: access layer uses services/* directly. This facade remains for
+// tests/scripts that still `import * as db`. Public signatures unchanged.
 
 export {
   createAdminSession,
