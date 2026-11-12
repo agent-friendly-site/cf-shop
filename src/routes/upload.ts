@@ -4,24 +4,16 @@
 //   GET  /shops/:shop/orders/:id/upload-proof?token=...  — upload page
 //   POST /shops/:shop/orders/:id/upload-proof?token=...  — multipart upload
 //
-// The buyer opens the link in a browser and uploads the screenshot
-// directly to the platform (R2). The image never goes through the
-// buyer's agent: no agent-side image recognition, no transaction id
-// to extract from a screenshot. The agent's only job is to hand the
-// buyer the link (MCP tool get_payment_proof_upload_link) and then
-// poll get_order until the order becomes payment_submitted.
-//
-// Security: the token is single-use, expires after 7 days, and only
-// its SHA-256 hash is stored (see db.js). The order id alone is not
-// enough — without a valid token the page and the upload both refuse.
-// Uploaded images are private in R2; the seller views them through
-// the authenticated admin image endpoint in src/admin.js.
+// Phase 4: token validation via routes/middleware; data via services.
 import type { Hono } from "hono";
-import * as db from "./db";
-import type { Env } from "./env";
+import * as catalog from "../services/catalog";
+import * as orders from "../services/orders";
+import * as payments from "../services/payments";
+import type { AppEnv } from "./helpers";
+import { requireProofUploadToken } from "./middleware";
+import { uploadFormFieldsSchema } from "./schemas";
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
-type AppEnv = { Bindings: Env };
 
 const ALLOWED_MIME: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -47,14 +39,14 @@ export function registerProofUploadRoutes(app: Hono<AppEnv>) {
     const slug = c.req.param("shop");
     const orderId = c.req.param("id");
     const token = c.req.query("token") || "";
-    const shop = await db.getShop(c.env.DB, slug);
+    const shop = await catalog.getShop(c.env.DB, slug);
     if (!shop)
       return c.html(page("店铺不存在", `<h1>店铺不存在</h1><p>未知店铺：${esc(slug)}</p>`), 404);
-    const order = await db.getOrder(c.env.DB, orderId);
+    const order = await orders.getOrder(c.env.DB, orderId);
     if (!order || order.shop !== slug) {
       return c.html(page("订单不存在", `<h1>订单不存在</h1><p>未知订单：${esc(orderId)}</p>`), 404);
     }
-    const valid = await db.verifyProofUploadToken(c.env.DB, { shop: slug, orderId, token });
+    const valid = await requireProofUploadToken(c, { shop: slug, orderId, token });
     if (!valid) {
       return c.html(
         page(
@@ -109,13 +101,13 @@ export function registerProofUploadRoutes(app: Hono<AppEnv>) {
     const slug = c.req.param("shop");
     const orderId = c.req.param("id");
     const token = c.req.query("token") || "";
-    const shop = await db.getShop(c.env.DB, slug);
+    const shop = await catalog.getShop(c.env.DB, slug);
     if (!shop) return c.html(page("店铺不存在", `<h1>店铺不存在</h1>`), 404);
-    const order = await db.getOrder(c.env.DB, orderId);
+    const order = await orders.getOrder(c.env.DB, orderId);
     if (!order || order.shop !== slug) {
       return c.html(page("订单不存在", `<h1>订单不存在</h1>`), 404);
     }
-    const tokenRow = await db.verifyProofUploadToken(c.env.DB, { shop: slug, orderId, token });
+    const tokenRow = await requireProofUploadToken(c, { shop: slug, orderId, token });
     if (!tokenRow) {
       return c.html(
         page(
@@ -160,7 +152,6 @@ export function registerProofUploadRoutes(app: Hono<AppEnv>) {
     const mime = (file.type || "").toLowerCase();
     let ext: string | undefined = ALLOWED_MIME[mime];
     if (!ext) {
-      // Some browsers send an empty MIME type; fall back to the extension.
       const m = /\.([a-zA-Z0-9]+)$/.exec(file.name || "");
       const byExt: Record<string, string> = {
         jpg: "jpg",
@@ -180,14 +171,20 @@ export function registerProofUploadRoutes(app: Hono<AppEnv>) {
         );
       }
     }
-    const paymentMethodRaw = body.payment_method;
-    const method =
-      typeof paymentMethodRaw === "string" &&
-      ["bank_transfer", "wechat_pay", "alipay"].includes(paymentMethodRaw)
-        ? paymentMethodRaw
-        : "bank_transfer";
-    const transactionId = typeof body.transaction_id === "string" ? body.transaction_id.trim() : "";
-    const amountRaw = typeof body.amount_cny === "string" ? parseFloat(body.amount_cny) : NaN;
+    const fields = uploadFormFieldsSchema.safeParse({
+      payment_method: typeof body.payment_method === "string" ? body.payment_method : undefined,
+      transaction_id: typeof body.transaction_id === "string" ? body.transaction_id : undefined,
+      amount_cny: typeof body.amount_cny === "string" ? body.amount_cny : undefined,
+    });
+    if (!fields.success) {
+      return c.html(
+        page("上传失败", `<h1 class="err">表单字段无效</h1><p>请检查付款方式后重试。</p>`),
+        400,
+      );
+    }
+    const method = fields.data.payment_method;
+    const transactionId = fields.data.transaction_id.trim();
+    const amountRaw = parseFloat(fields.data.amount_cny);
     const amountCny = Number.isFinite(amountRaw) && amountRaw > 0 ? amountRaw : null;
 
     if (!ext) {
@@ -204,7 +201,7 @@ export function registerProofUploadRoutes(app: Hono<AppEnv>) {
     await c.env.PROOFS.put(key, bytes, {
       httpMetadata: { contentType: `image/${ext === "jpg" ? "jpeg" : ext}` },
     });
-    await db.addImagePaymentProof(c.env.DB, {
+    await payments.addImagePaymentProof(c.env.DB, {
       orderId,
       paymentMethod: method,
       fileName: file.name || "payment.png",
@@ -214,7 +211,7 @@ export function registerProofUploadRoutes(app: Hono<AppEnv>) {
       transactionId: transactionId || null,
       amountCny,
     });
-    await db.consumeProofUploadToken(c.env.DB, tokenRow.token_hash);
+    await payments.consumeProofUploadToken(c.env.DB, tokenRow.token_hash);
     return c.html(
       page(
         "凭据已提交",

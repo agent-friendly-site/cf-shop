@@ -1,19 +1,20 @@
 // agent-friendly-platform: the whole multi-merchant agent-first platform
 // as one Hono Worker on Cloudflare Workers + D1.
 //
-// Phase 4.1: read routes split into routes/; write paths still top-level for now.
+// Phase 4.1/4.3: routes/ holds health/shop/orders/admin/upload + middleware.
+// MCP still top-level until Phase 4.2.
 
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { Hono } from "hono";
-import { registerAdminRoutes } from "./admin";
 import { AUTO_COMPLETE_AFTER_DAYS, UNPAID_EXPIRY_MINUTES } from "./domain/constants";
 import type { Env } from "./env";
 import { createMcpServer } from "./mcp";
-import { registerProofUploadRoutes } from "./proof_upload";
+import { registerAdminRoutes } from "./routes/admin";
 import { registerHealthRoutes } from "./routes/health";
 import { type AppEnv, notFound, shopOr404 } from "./routes/helpers";
 import { registerOrderRoutes } from "./routes/orders";
 import { registerShopRoutes } from "./routes/shop";
+import { registerProofUploadRoutes } from "./routes/upload";
 import * as jobs from "./services/jobs";
 
 const app = new Hono<AppEnv>();
