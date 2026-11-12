@@ -62,9 +62,9 @@ tsconfig.json      TypeScript strict
 | --- | --- |
 | `deploy-verify` | 构建部署、线上冒烟、回滚 |
 | `parity-check` | 店铺路由/MCP/后台 API 契约比对 |
-| `phase5-admin-upload` | Phase 5 后台+上传页（含 flag 切流） |
+| `phase5-admin-upload` | Phase 5 后台+上传页（历史清单；双轨已结束） |
 
-Phase 5 切流方案（默认可回退）：`docs/phase5-ui-cutover.md`。
+Phase 5 切流记录（已切 HonoX、双轨已删）：`docs/phase5-ui-cutover.md`。
 
 ## 规矩
 
@@ -143,12 +143,11 @@ Phase 5 切流方案（默认可回退）：`docs/phase5-ui-cutover.md`。
 
 - v1.7.0 已上线：15 分钟未付款自动取消、上传链接交截图、卖家核验、
   跟踪 + 后台管理。全部功能见 `README.md` 的版本记录。
-- 重构：`docs/refactor-plan.md`。**Phase 0–4 完成**（含 3.x 收口）。
+- 重构：`docs/refactor-plan.md`。**Phase 0–5 完成**（含 3.x 收口）。
   Phase 4：`routes/` + `mcp/tools/*`、鉴权中间件、接入层全调 services、
   `scripts/gen-data.ts` → `src/static/data.ts`。
-  **下一步 Phase 5**（HonoX 重写后台页 + 上传页；删 ADMIN_HTML）。
-  前端已定 HonoX 0.1.62（pin 死）+ React 渲染器 + Tailwind v4 + shadcn/ui；
-  只接后台和上传页，API/MCP 不迁文件路由。接手时先读计划 + `docs/phase5-ui-cutover.md`
-  + skill `phase5-admin-upload`，按阶段做，不要跳阶段；**未切默认 honox 并真机签字前不许删旧 HTML**。
-- 待 Hall 手动做的事：关 GitHub Pages；部署后 `compare_routes.py` + TEST_PROMPTS
-  关键路径；Phase 5 真机点后台/上传页（先 `?ui=honox`）。
+  Phase 5：HonoX（pin 0.1.62）+ React 岛 + Tailwind v4 + shadcn；
+  `app/server.ts` 入口；`UI_MODE` 双轨已删；`ADMIN_HTML` / upload `page()` 已删。
+  Admin UX 精修（P0→P1）：`admin-shell`、共享 Auth/QC/Toaster、深链与中文状态。
+  下一步 Phase 6（脚本收尾 / 2.0.0）。
+- 待 Hall 手动做的事：关 GitHub Pages；`TEST_PROMPTS` 关键路径。

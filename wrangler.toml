@@ -4,8 +4,14 @@
 # This file is the source of bindings + cron for both deploy and
 # local dev (`npx wrangler dev`).
 name = "agent-friendly-platform"
-main = "dist/worker.mjs"
+# Phase 5: Vite + HonoX build output (npm run build → vite client + server).
+main = "./dist/index.js"
 compatibility_date = "2025-06-01"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+# Client build lands in dist/static; Worker is dist/index.js (excluded via .assetsignore).
+directory = "./dist"
 
 [[d1_databases]]
 binding = "DB"

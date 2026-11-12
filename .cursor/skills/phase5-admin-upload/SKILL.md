@@ -1,51 +1,42 @@
 ---
 name: phase5-admin-upload
 description: >-
-  Execute Phase 5 HonoX rewrite of admin and proof-upload pages for cf-shop
-  with feature-flag cutover. Use when working on app/ islands, ADMIN_HTML
-  removal, upload page rewrite, or Phase 5 acceptance.
+  Phase 5 HonoX admin + proof-upload for cf-shop (cutover complete).
+  Use when working on app/ islands, admin shell, or upload page.
 ---
 
-# Phase 5 — admin + upload UI
+# Phase 5 — admin + upload UI（已切 HonoX）
 
-HonoX 重写后台页与上传页。读并遵守 `docs/phase5-ui-cutover.md` 与 `docs/refactor-plan.md` §5。不动 API/MCP/状态机。
-
-## When to use
-
-- 开始或继续 Phase 5
-- 改 `app/` 岛、后台/上传 SSR
-- 准备删 `ADMIN_HTML` / `page()` 之前做切流验收
+双轨已结束：仅 HonoX。见 `docs/phase5-ui-cutover.md` 与 `docs/refactor-plan.md` §5。不动 API/MCP/状态机。
 
 ## Hard rules
 
-1. **API / MCP / 店铺静态路由不迁文件路由**；HonoX 只接两个页面。
-2. **岛之间不许互相 import**；共用逻辑放 `app/lib/`。
+1. **API / MCP / 店铺静态路由不迁文件路由**；HonoX 只接后台与上传页。
+2. **岛之间不许互相 import**；共用逻辑放 `app/lib/`（含 Auth bus、`getQueryClient()`）。
 3. **`honox-island { display: contents; }` 不许删**。
 4. React 岛与 hono/jsx 岛不混写；React 岛用 `className` + `react` hooks。
 5. 金额 / 时限 / 状态机判断在服务端；岛只调 API、展示状态。
 6. 新后台禁止 `alert()` / `confirm()`。
-7. **未按切流文档切到默认 `honox` 并经真机签字前，禁止删 `ADMIN_HTML` / upload `page()`。**
+7. 全后台唯一 Toaster 在 `admin-shell`；上传页自带一个 Toaster。
 
-## Implementation order
+## Architecture
 
-1. 读 `docs/phase5-ui-cutover.md`，实现 `UI_MODE` + 覆盖开关（先 flag，后删旧页）。
-2. **先上传页**（5.1）→ 默认仍 legacy，用 `?ui=honox` 真机验。
-3. **再后台页**（5.2）→ 同上。
-4. Hall/负责人真机清单全过 → 默认改 `honox` → 观察 → 再删旧 HTML（5.3）。
-5. 跑 Phase 5 静态检查（岛 import、display:contents、无 ADMIN_HTML 残留）。
+- SSR：`app/routes/shops/[shop]/admin/index.tsx` 渲染 `AdminShell` + 四内容岛。
+- 壳岛：登录 / 常驻导航 / Toaster。
+- 内容岛：鉴权读 session bus；未登录 `return null`。
+- Query：`getQueryClient()` 模块单例，跨岛 invalidate 生效。
 
 ## Local verify
 
 ```bash
-npm run typecheck
+npx tsc --noEmit
 npm test
+npm run build
 npm run dev
-# 浏览器：
-#   /shops/bean-bloom/admin/?ui=honox
-#   上传链接加 &ui=honox
+# 浏览器：/shops/bean-bloom/admin
 ```
 
-## Real-device checklist（声称完成前）
+## Real-device checklist
 
 ### 上传页
 
@@ -58,29 +49,15 @@ npm run dev
 
 ### 后台页
 
-- [ ] 错 key →「Key 不对…」类可读错误，非裸 JSON
-- [ ] 登录成功 → 列表；筛选不丢
-- [ ] 确认收款：金额不符前端先拦；成功状态变已付款
-- [ ] 发货、取消（Dialog 确认）、商品/政策行内编辑
-- [ ] 凭据图可看；未登录图片 401
-- [ ] 无 `alert`/`confirm`
-- [ ] 手机可完成登录→开单→确认收款
-
-### 计时（可选但推荐记一笔）
-
-- 后台：从导航到**订单列表可点击**的时间
-- 上传：从打开链接到**文件按钮可点**的时间  
-  不要用「出了个 logo/标题」冒充可用。
-
-## After UI sign-off
-
-1. `UI_MODE` 默认 `honox`（见切流文档）。
-2. 再跑 deploy-verify + parity-check（C/D）。
-3. 删 `ADMIN_HTML` / `page()`；`grep` 零命中（测试除外）。
-4. 更新 `AGENTS.md` 当前状态：Phase 5 完成。
+- [ ] 错 key → 可读错误
+- [ ] 登录后切「商品」「政策」立即有内容；常驻三 tab
+- [ ] 筛选 `?status=` 刷新仍在；Badge 中文
+- [ ] 确认收款 / 发货 / 取消后列表即时变；Toast 只一条
+- [ ] 商品「取消」还原；政策可改收款说明
+- [ ] 凭据图可点放大；无 `alert`/`confirm`
 
 ## Do not
 
-- 跳过 flag、一次性替换线上默认 UI
-- 在岛里复制状态机或「顺手」给 MCP confirm_payment 加鉴权（非目标）
-- 混进行为改动（价格、15 分钟、7 天）——重构 commit 不混行为
+- 恢复 `UI_MODE` / legacy HTML 双轨
+- 在岛里复制状态机或「顺手」改 MCP
+- 混进行为改动（价格、15 分钟、7 天）

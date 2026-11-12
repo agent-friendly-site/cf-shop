@@ -46,8 +46,10 @@ function main() {
   for (const f of files) {
     const relFromData = path.relative(DATA, f).split(path.sep).join("/");
     const v = varname(relFromData);
-    // Imports are relative to src/static/data.ts → ../data/...
-    lines.push(`import ${v} from "../data/${relFromData}";`);
+    // JSON stays as modules; other shop files use Vite/esbuild-compatible ?raw
+    // so HonoX Vite build does not parse .html/.md as app HTML.
+    const suffix = relFromData.endsWith(".json") ? "" : "?raw";
+    lines.push(`import ${v} from "../data/${relFromData}${suffix}";`);
     exports.push({ rel: relFromData, v });
   }
   lines.push("");

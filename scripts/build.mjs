@@ -17,6 +17,18 @@ await build({
   minify: true,
   sourcemap: false,
   loader: { ".txt": "text", ".md": "text", ".html": "text", ".xml": "text" },
+  // gen-data emits `?raw` for Vite; strip query so esbuild text loaders still apply.
+  plugins: [
+    {
+      name: "strip-raw-query",
+      setup(build) {
+        build.onResolve({ filter: /\?(raw)$/ }, (args) => ({
+          path: args.path.replace(/\?raw$/, ""),
+          namespace: args.namespace,
+        }));
+      },
+    },
+  ],
   logLevel: "info",
 });
 console.log("built dist/worker.mjs");
