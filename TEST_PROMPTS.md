@@ -1,8 +1,12 @@
-# Test prompts — order tracking + seller admin (v1.7.0)
+# Test prompts — order tracking + seller admin (v2.0.0)
 
-Consumer-voice prompts for the new order lifecycle. Each prompt is
+Consumer-voice prompts for the order lifecycle. Each prompt is
 self-contained: paste it to a fresh agent with only the shop URL.
 "Expected" lines are grading notes for Hall, not part of the prompt.
+
+**关闭路径缺口：** 本文件现仅有 **19–27**。重构计划曾要求盲测至少覆盖
+8 / 15 / 18 / 25 / 26 / 27，但 1–18 未收录进仓库（git 历史亦无完整正文）。
+发版盲测以 **25、26、27** 为准；1–18 待 Hall 补回。
 
 Shop URLs (canonical host):
 - terra-pots: https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/

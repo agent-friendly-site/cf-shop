@@ -48,6 +48,12 @@ description: >-
 
 4. **线上冒烟（带浏览器 UA）**
 
+   优先：
+
+   ```bash
+   npm run test:smoke
+   ```
+
    Base：`https://agent-friendly-platform.refined-x.workers.dev`  
    workers.dev 有 Browser Integrity Check，curl 必须带 UA。
 
@@ -58,7 +64,7 @@ description: >-
    | health | `GET /health` |
    | 店铺发现 | `GET /shops/bean-bloom/llms.txt` |
    | MCP 工具 | `POST /shops/bean-bloom/mcp` → `tools/list`，确认 13 个工具名 |
-   | 后台页 | `GET /shops/bean-bloom/admin/` 返回 HTML（Phase 5 期间看 UI flag） |
+   | 后台页 | `GET /shops/bean-bloom/admin` → HTML 含 HonoX 岛 / `admin-shell` |
    | 静态契约 | 需要时跑 parity-check skill |
 
    示例：
@@ -78,7 +84,7 @@ description: >-
 
 6. **汇报格式**
 
-   - 新 Version ID
+   - 新 Version ID（写入 [`README.md`](../../../README.md) **发版记录**表）
    - 冒烟里实际看到的关键字段（health、tools 数量、页面是否可交互）
    - Pages/边缘有同步延迟时：**明说未刷出来**，不要硬报成功
    - 失败：给回滚命令（redeploy 上一 Version ID），不要继续叠补丁瞎试

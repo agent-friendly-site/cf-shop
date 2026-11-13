@@ -1,34 +1,12 @@
 # agent-friendly-platform
 
-The agent-friendly multi-merchant platform, hosted entirely on Cloudflare:
-**one Hono Worker + one D1 database**. No more split between a GitHub Pages
-static site and a separate MCP Worker.
+Cloudflare 上的多商户 **agent 专属商城**：单 Hono Worker + D1 + R2。  
+Live: https://agent-friendly-platform.refined-x.workers.dev · **v2.0.0**
 
-Live: https://agent-friendly-platform.refined-x.workers.dev
-
-- Agent-only storefronts at `/shops/:shop/` — no human shopping UI.
-- Discovery: give an agent a shop URL; it reads `{shop}/llms.txt`, then
-  `openapi.json`, `agent.json`, `api/products.json`, `policies.json`.
-- Live MCP: `POST /shops/:shop/mcp` (Streamable HTTP, protocol 2025-06-18),
-  11 tools: `list_products`, `get_product`, `recommend_products`,
-  `calculate_total`, `create_order`, `submit_payment_proof`,
-  `confirm_payment` (seller-side), `get_order`, `mark_shipped`
-  (seller-side), `confirm_receipt`, `cancel_order`.
-- Payment is offline: the seller provides payment instructions in the
-  order confirmation, the buyer pays outside the agent, then submits the
-  transaction id; the seller verifies within 24h and ships in 2 business
-  days. Never send card numbers or verification codes in chat.
-- Order tracking is automatic: after `create_order` the buyer's agent
-  checks `get_order` every 6 hours and tells the buyer when the status
-  changes, until `completed` or `cancelled`. Lifecycle:
-  `pending_payment` → `payment_submitted` → `paid` → `shipped` →
-  `completed` (buyer confirms receipt, or auto-completed 7 days after
-  shipping); cancellable before paid. Every status change is recorded
-  in the order timeline (`get_order.timeline`, or
-  `GET /shops/:shop/api/orders/:id/events`).
-- Seller admin: `/shops/:shop/admin/` (web UI + JSON API, one API key
-  per shop, see below). Sellers confirm payments, mark orders shipped,
-  and edit prices, stock and policies there.
+- 店面：`/shops/:shop/`（无人类购物 UI）；发现靠 `llms.txt`
+- MCP：`POST /shops/:shop/mcp`（Streamable HTTP，13 工具）
+- 付款线下；买家用一次性上传链接交截图；卖家后台核验 / 发货
+- 生命周期：`pending_payment` → `payment_submitted` → `paid` → `shipped` → `completed`（可在付款前 `cancelled`）；未付款 15 分钟自动取消；发货 7 天可自动完成
 
 ## Shops
 
@@ -38,340 +16,79 @@ Live: https://agent-friendly-platform.refined-x.workers.dev
 | `paper-lantern` | Paper Lantern Stationery / 纸灯文具 | Notebook 38, Gel pen 18, Washi tape 25 |
 | `terra-pots` | Terra Pots Ceramics / 陶土手作 | Mug 128, Plate 98, Vase 158 |
 
-Shipping flat 12 CNY, free over 200 CNY, 7-day returns (unused, buyer pays
-return shipping). Prices and stock are the same as the GitHub Pages demo;
-they were imported verbatim, not invented.
+运费统一 12 元，满 200 包邮；7 天退货（未使用、买家承担运费）。事实在 `src/data/`。
 
 ## Architecture
 
 ```
-Cloudflare (the only deployment target)
-└── Worker agent-friendly-platform (Hono, src/index.js)
-    ├── static content: llms.txt, guide.md, starter-prompt.txt,
-    │   openapi.json, agent.json, mcp.json (src/data, bundled)
-    ├── D1-backed JSON: api/products.json, api/catalog.json,
-    │   policies.json, api/payment.json, api/recommendations.json,
-    │   api/presentation.json (llms.txt product lines and
-    │   llms-full.txt are also rendered from D1)
-    ├── live MCP: POST /shops/:shop/mcp
-    │   (McpServer + WebStandardStreamableHTTPServerTransport,
-    │   the SDK's own Hono example pattern; src/mcp.js)
-    └── D1 agent-friendly-orders (drizzle/ migrations, see below)
-GitHub (this repo): code + seed data only. GitHub Pages is NOT used.
+Worker agent-friendly-platform
+├── app/                 HonoX SSR + React 岛（后台 / 上传页）
+├── src/
+│   ├── routes/          HTTP 接入（health / shop / orders / admin / upload / mcp）
+│   ├── mcp/             MCP server + tools/*
+│   ├── services/        业务编排
+│   ├── domain/          纯规则（状态机、金额、凭据）
+│   ├── db/              Drizzle schema + repositories
+│   └── data/            店铺事实（改事实只改这里）
+├── drizzle/             D1 migrations
+└── bindings             D1 agent-friendly-orders · R2 PROOFS
 ```
 
-Why Hono: built for Workers (fast, tiny, no Node adapter), one app serves
-static files, REST routes and MCP, middleware covers auth/rate-limit/CORS
-later, `@hono/zod-openapi` can generate OpenAPI from code, and D1/R2/DO/
-Queues all have first-class bindings. The MCP SDK's
-`WebStandardStreamableHTTPServerTransport` is the Workers-compatible
-transport; the server is created fresh per request (stateless).
+分层：`routes` / `mcp` / `app` → `services` → `domain` + `db/repositories`。  
+细节见 `docs/design-order-tracking-admin.md`（含 v2.0 架构节）与 `docs/refactor-plan.md`。
 
-## D1 schema
+## Commands
 
-Source of truth: `src/db/schema.ts` (13 tables). SQL migrations are
-owned by drizzle-kit under `drizzle/` (baseline `0000_baseline.sql`).
-Hand-written v1 SQL (`0001`–`0005`) is archived in `migrations/archive/`
-and must not be re-applied.
-
-Tables: `shops`, `products`, `shop_policies`, `payment_methods`,
-`shop_payment` (incl. `never_in_chat_json`), `recommendations`,
-`shop_bundles`, `orders` (seller verification + tracking columns),
-`payment_proofs` (transaction + image proofs), `order_events`,
-`shop_admin_keys`, `admin_sessions`, `proof_upload_tokens`.
-
-### D1 migrations
-
-```sh
-# After editing src/db/schema.ts:
-npx drizzle-kit generate --name <change>
-npx wrangler d1 migrations apply agent-friendly-orders --local
-
-# Production already has the baseline schema (applied historically via
-# the archived 0001–0005 SQL, not via wrangler). Do NOT run
-# `migrations apply --remote` until 0000_baseline is recorded as applied
-# in d1_migrations (otherwise CREATE TABLE will collide). Future ALTERs
-# generated by drizzle-kit are the ones to apply remotely.
-```
-
-Order status flow: `pending_payment` → `payment_submitted` → `paid` →
-`shipped` → `completed` (`cancelled` possible before paid). A daily
-cron trigger (02:00 UTC) runs the Worker's `scheduled()` handler, which
-auto-completes orders shipped more than 7 days ago with no buyer
-confirmation (event `auto_completed`). Orders without `shipped_at`
-(including all pre-1.2.0 orders) are never auto-completed.
-`idempotency_key` is UNIQUE on `orders`: replays return the original
-order instead of creating a duplicate.
-
-> **Seller verification is real, not simulated.** `submit_payment_proof`
-> only moves an order to `payment_submitted`. The seller then checks the
-> actual receipt (bank / WeChat / Alipay) and amount and calls the
-> seller-side tool `confirm_payment` with `verified_amount_cny`; the amount
-> must equal the order total, or the order stays `payment_submitted`. Only
-> then does the order become `paid` and ship. The seller admin web UI
-> (`/shops/:shop/admin/`) calls the same `confirmPayment` logic behind
-> per-shop API-key auth; the MCP tool itself still has no seller
-> authentication, so in production the admin UI is the seller path.
-
-## Seller admin
-
-- Web UI: `https://agent-friendly-platform.refined-x.workers.dev/shops/:shop/admin/`
-  (dashboard counts, order list with status filter, order detail with
-  proofs + timeline, one-click confirm payment with amount-mismatch
-  warning, mark shipped, product price/stock editing, policy editing).
-- Auth: one API key per shop. Keys are generated with
-  `python3 scripts/gen_admin_keys.py <account-id> <database-id>`; only
-  SHA-256 hashes are stored in D1, the plaintext keys are printed once
-  and must be handed to the shop owners (never committed). Login sets an
-  httpOnly session cookie (24h); API calls also accept
-  `Authorization: Bearer <key>`.
-- JSON API (all under `/shops/:shop/admin/api/`, auth required):
-  `GET /me`, `POST /login`, `POST /logout`,
-  `GET /orders?status=&limit=`, `GET /orders/:id`,
-  `POST /orders/:id/confirm-payment`, `POST /orders/:id/mark-shipped`,
-  `POST /orders/:id/cancel`, `GET|PUT /products/:id`,
-  `GET|PUT /policies`. Admin routes are not listed in `llms.txt` /
-  `agent.json` — the admin is for the human seller, not buyers' agents.
-
-## Local development
-
-```sh
+```bash
 npm install
-npm run build          # esbuild -> dist/worker.mjs
-npx wrangler d1 migrations apply agent-friendly-orders --local
-npx wrangler dev       # local dev, local D1 from drizzle/
-```
-
-To seed a local D1 (or re-seed production), use the TypeScript seed script
-(Phase 2.4; reads `src/data`, applies via wrangler). For a brand-new local
-DB apply `drizzle/` first:
-
-```sh
-npx wrangler d1 migrations apply agent-friendly-orders --local
-npm run seed -- --local
-npm run seed -- --remote          # re-seed production catalog
-npm run seed -- --dump            # print statements (compare with seed.py --dump)
-```
-
-The legacy Python seeder remains as `npm run seed:py` / `scripts/seed.py`
-(muse surrogate credentials; still supports `--dump` for parity checks).
-
-Re-import shop data from the GitHub Pages source (rewrites hosts, applies
-the documented text fixes) and regenerate the bundled data module:
-
-```sh
-python3 scripts/import_data.py
-npm run gen-data   # writes src/static/data.ts
+npm run build                 # Vite client + server → dist/
+npm run dev                   # 本地 Vite / HonoX
+npm test                      # 本地 Vitest（unit + integration + D1）
+npm run test:smoke            # 线上冒烟（health / llms / tools/list / admin）
+npm run gen-data              # src/data → src/static/data.ts
+npm run seed -- --local       # 同步店铺事实到本地 D1（--remote 写生产）
+npm run update-shop-facts -- --local   # 只刷新政策/收款 JSON 列
+npm run gen-admin-keys -- --remote     # 轮换后台 key（明文只打 stdout，勿提交）
 ```
 
 ## Deploy
 
-Phase 0 (2026-11-11) verified **`npx wrangler deploy`** as the default path
-(OAuth via `npx wrangler login`; do not commit tokens). `wrangler.toml`
-already carries the D1, R2, and cron bindings.
-
-```sh
+```bash
+npx wrangler login            # 首次
 npm run build
 npx wrangler deploy
+npm run test:smoke
 ```
 
-Fallback (legacy): `cf.py worker-put` with explicit `--d1-binding` /
-`--r2-binding` if wrangler auth is unavailable. See `docs/refactor-plan.md`
-§2.2 for the Phase 0 decision record.
+记下部署返回的 **Version ID**，写入下方发版记录。回滚靠上一 Version。  
+仓外 `cf.py worker-put` 仅兜底。Cron：`* * * * *`（免费账号触发器上限已满）。
 
-Live at `https://agent-friendly-platform.refined-x.workers.dev`.
-Account `b74b5f1383b4c12d7d98a26b462e7c22`, D1 `agent-friendly-orders`
-`dd3c36b4-a260-4fc5-9da2-b9b06ccfb1cc`, workers.dev subdomain `refined-x`.
-No custom domain yet (by Hall's choice).
+## Seller admin
 
-HonoX spike (Phase 0b, separate Worker, not production):
-`https://agent-friendly-honox-spike.refined-x.workers.dev` — source in
-`spike-honox/` (pin `honox@0.1.62`).
+- URL：`/shops/:shop/admin`
+- 鉴权：每店一个 `afk_…` key（登录后 httpOnly cookie）；key 哈希存 D1，明文不进仓库
+- 生成：`npm run gen-admin-keys -- --remote`（会轮换；勿为测试随便轮换 Hall 的 key）
 
 ## Tests
 
-```sh
-python3 tests/test_client.py [shop]   # MCP end-to-end (default terra-pots)
-ADMIN_KEY=<terra-pots admin key> python3 tests/test_admin.py
-                                       # seller admin API end-to-end
-python3 tests/compare_routes.py       # every route vs GitHub Pages
-```
+| 层 | 命令 | 范围 |
+| --- | --- | --- |
+| 本地 | `npm test` | 状态机 / 金额 / 鉴权 / MCP tools/list / jobs |
+| 线上冒烟 | `npm run test:smoke` | health、发现面、13 tools、admin 壳 |
+| 盲测 | `TEST_PROMPTS.md` | fresh agent；至少 25–27（见文件缺口说明） |
+| 真机 | 浏览器 | 后台登录 / 核验 / 发货；上传页主路径 |
 
-MCP end-to-end (verified live 2026-11-11): initialize → protocol
-2025-06-18, server `agent-friendly-platform 1.0.0`; tools/list → 7 tools;
-`list_products` terra-pots → mug 128/15, plate 98/22, vase 158/8;
-`recommend_products` (daily water/tea, budget 300) → first choice mug,
-alternative plate; `calculate_total` mug x1 → `128 元 + 12 元运费 = 140 元`;
-`create_order` mug x1 → order `ord_mwbmqj05ft5d`, 140, `pending_payment`;
-`submit_payment_proof` (WeChat, test txn) → `paid`; `get_order` → `paid`
-with 1 proof. **E2E PASS.** (That run used the old simulated flow. Since
-1.1.0, `submit_payment_proof` only reaches `payment_submitted` and
-`confirm_payment` is required — see the 1.1.0 test below.)
+## 发版记录
 
-MCP end-to-end, seller verification (verified live 2026-11-11, v1.1.0,
-`python3 tests/test_client.py`): tools/list → 8 tools; `create_order`
-mug x1 → order `ord_mwbqmz0cy8ru`, 140, `pending_payment`;
-`submit_payment_proof` (WeChat, test txn, 140) → `payment_submitted`;
-`confirm_payment` with 100 → error, stays `payment_submitted`;
-`confirm_payment` with 140 → `paid` (`verified_amount_cny` 140);
-`get_order` → `paid` with 1 proof. **E2E PASS.** Pre-1.1.0 test orders
-that were marked `paid` under the old simulated flow keep their `paid`
-status with `verified_amount_cny` null — they were never seller-verified,
-and the migration did not rewrite them.
+| 版本 | 日期 | Version ID | 说明 |
+| --- | --- | --- | --- |
+| 2.0.0 | 2026-11-13 | `86d53011-1153-4246-b86e-4b5ce19657fa` | 重构收尾：全 TS 脚本、HonoX 后台、无仓内 `.py`（上一版 `740d2bec-a9f5-465c-8837-4eb37cf2b322`）。smoke 过；平台侧核对 prompt 25/26/27（缺地址拒单、upload link、15 分钟 deadline）；fresh-agent 盲测仍待 Hall |
+| 1.7.0 | 2026-11-11 | — | 15 分钟未付款自动取消等（见 git 历史） |
 
-Order tracking + seller admin (verified live 2026-11-11, v1.2.0):
-`python3 tests/test_client.py` — tools/list → 11 tools; `create_order`
-mug x1 (with buyer name/contact/address) → order `ord_mwbrdvelxsaq`,
-140, `pending_payment`, timeline starts with `order_created`;
-`confirm_receipt` on a pending order → error; `submit_payment_proof`
-→ `payment_submitted`; `confirm_payment` 100 → error, 140 → `paid`;
-`cancel_order` on the paid order → error; `mark_shipped` (顺丰,
-SF1234567890) → `shipped`; `confirm_receipt` → `completed`; timeline
-is exactly `[order_created, payment_proof_submitted,
-payment_confirmed, shipped, receipt_confirmed]`; a second order
-cancelled before paying → `cancelled`. **E2E PASS.**
-`ADMIN_KEY=... python3 tests/test_admin.py` — admin without a key →
-401, wrong key → 401, login → session cookie, `/me` OK; fresh order
-`ord_mwbre7zpoiw7` confirmed and shipped through the admin API
-(`confirm_payment` 100 → 400, 140 → `paid`; `mark-shipped` →
-`shipped`, tracking SF999888777); buyer `confirm_receipt` →
-`completed`; events endpoint returns the same 5-event timeline;
-products PUT round-trip (stock +1, then restored); policies GET shows
-the new status list. **ADMIN E2E PASS.** Auto-complete: a shipped
-order backdated 8 days (`ord_mwbrfdkxt5m1`) is the only row the
-auto-complete query selects; old paid orders have no `shipped_at` and
-are excluded. The cron trigger itself (daily 02:00 UTC) has not fired
-yet — the backdated order is expected to complete on the next run.
+## Docs for agents
 
-Order flow correction (v1.3.0, 2026-11-11, after Hall's own test order
-`ord_mwbs00xustqe`): the v1.2.0 flow created the tracking task right
-after `create_order` and only said "the seller provides payment
-methods", so the buyer never received the seller's receiving account
-and was tracked before paying. Corrected order: `create_order` →
-agent sends the seller's configured payment methods with receiving
-accounts (from `api/payment.json`, editable in admin under
-policies → payment methods; demo shops carry clearly-marked test
-accounts) → buyer pays offline → buyer submits the transaction id or
-a payment screenshot (the agent reads the id from the screenshot) →
-`submit_payment_proof` → `payment_submitted`, and only then the agent
-creates the tracking task (6-hour `get_order` polls, notify on change,
-stop at `completed`/`cancelled`) → seller confirms payment in admin →
-ships → buyer confirms receipt. Cancelling an order also deletes its
-tracking task. `never_in_chat` now means the *buyer's* card number /
-verification code / payment password; the seller's receiving account
-in `payment.json` is meant to be shown to the buyer.
-Update buyer info (v1.4.0, 2026-11-11, from the blind test of v1.3.0):
-the test agent created an order before asking for buyer info, and MCP
-had no way to attach it afterwards — the order's buyer fields stayed
-null. New MCP tool `update_buyer_info` (12 tools total): fill in or
-correct buyer_name / buyer_contact / shipping_address after
-`create_order`, at least one field required, only given fields change,
-allowed while the order is pending_payment, payment_submitted or paid,
-frozen once shipped; the change is recorded in the order timeline as
-`buyer_info_updated` so the seller can see it. `guide.md` now tells
-the agent to use it instead of asking the buyer to place a new order.
-
-v1.4.1 (same day, Hall's follow-up): asking for buyer info before
-`create_order` is now a hard rule — ask first, create only after the
-info is given; creating first and asking afterwards is no longer
-allowed (only exception: the buyer explicitly insists after being
-warned the seller cannot ship without an address).
-
-v1.5.0 (same day, Hall's decision — tool-level requirement):
-`shipping_address` is now REQUIRED in `create_order`, enforced twice:
-the MCP schema rejects calls without it, and `db.createOrder`
-rejects an empty address. A blind test showed instruction-level
-wording alone did not hold — a fresh agent told "just order it"
-created an order with no buyer info. Now no agent can create an
-order without an address at all; `buyer_name` / `buyer_contact`
-stay optional, and a wrong address can still be fixed later with
-`update_buyer_info` before shipping.
-
-v1.6.0 (same day, Hall's decision — unified upload-link proof):
-payment proof has one unified path for screenshots. MCP has no
-first-class image upload, and a Muse HTML widget cannot reach the
-network (verified by a probe widget: fetch to two hosts failed), so
-the buyer submits a screenshot through a one-time upload link
-instead of through the agent. `create_order` returns
-`proof_upload.url` with the order, and the new MCP tool
-`get_payment_proof_upload_link` (13 tools total) mints a fresh one:
-single-use, 7-day expiry, only the SHA-256 hash stored in D1. The
-buyer opens the link in a browser and uploads the screenshot
-(JPG/PNG/WebP/GIF, 5MB); the image goes straight to private R2
-storage (`agent-friendly-proofs`, binding `PROOFS`) and the order
-becomes `payment_submitted` — the agent never reads the image and
-must NOT try to extract a transaction id from a screenshot. The
-seller sees the image in the admin order detail (served only
-through the authenticated admin image endpoint) and confirms with
-the amount read off the screenshot. `submit_payment_proof` is now
-for transaction ids sent as text only. Migration `0005` adds
-`proof_type` / R2 columns to `payment_proofs` (existing proofs
-kept) and the `proof_upload_tokens` table.
-
-v1.7.0 (same day, Hall's decision — 15-minute auto-cancel):
-an order with no payment proof auto-cancels 15 minutes after
-creation. `db.expireUnpaidOrders` runs from the Worker's
-`scheduled()` handler on an every-minute cron trigger (`* * * * *`).
-The old daily 02:00 UTC trigger was replaced by it: the account is
-on the Workers Free plan (5 cron triggers per account, already at
-the cap), so the Worker keeps one trigger and `scheduled()` runs
-both sweeps on every firing — the auto-complete query is cheap and
-usually finds nothing. Each
-cancellation goes through `transitionOrder()` (event
-`auto_cancelled`, actor `system`, reason "下单 15 分钟未付款，
-自动取消"). Only `pending_payment` orders expire — once a proof is
-submitted the order never expires, so the seller always has time
-to verify. `create_order` returns `payment_deadline` (15 minutes,
-`expires_at`) and the order carries `payment_expires_at` while
-pending; `guide.md` / `mcp.json` / `llms.txt` / `agent.json` all
-tell the agent to state the deadline when sending payment
-instructions. The upload link stays 7 days, but it is only useful
-within the 15-minute window — after auto-cancel it is refused.
-No migration: expiry uses the existing `created_at` + events.
-
-## Migration notes (from GitHub Pages + agent-friendly-mcp)
-
-- The old deployment was split: static JSON on GitHub Pages
-  (`agent-friendly-site.github.io`) + MCP on Worker `agent-friendly-mcp`
-  (catalog fetched live from Pages, orders in Durable Object `OrderStore`).
-  This repo replaces both. The old Worker and Pages site are still live
-  until switchover is approved; nothing here touches them.
-- One Durable Object order existed (`ord_mwbm04jqn387`, terra-pots test
-  order, paid, 1 WeChat proof). It was fetched via `get_order` on the old
-  Worker and migrated into D1 with its original id/status/proofs. The DO
-  has no list API, so no other orders could be enumerated; that test order
-  was the only one known.
-- `scripts/import_data.py` rewrites every URL from
-  `agent-friendly-site.github.io` / `agent-friendly-mcp.refined-x.workers.dev`
-  to this Worker, and fixes stale wording: duplicated sentences, "(no
-  shipment)" / "(no returns processed)" notes, "Payment happens on the shop
-  checkout page" (contradicts offline payment), "no product photos yet"
-  (photos exist now), and the old "GitHub Pages is static-only" MCP notes.
-  OpenAPI version bumped to 1.0.0.
-- Route comparison vs GitHub Pages (`tests/compare_routes.py`, 56 routes):
-  26 match exactly (after host normalization); the other 30 differ only by
-  the fixes above, the 1.0.0 version bump, the live-MCP wording — and
-  because live Pages is behind the local source files for `mcp.json`,
-  `openapi.json`, `agent.json` and `llms.txt` (the local source already
-  said "live MCP"; Pages still serves the pre-live text). No product,
-  price, stock or policy fact differs. Two real bugs found by the
-  comparison and fixed: `api/payment.json` was missing `never_in_chat`,
-  and presentation stock status used `in_stock` for quantity 8 where the
-  source says `low_stock` (thresholds now: 0 out_of_stock, 1–10 low_stock).
-- D1 `/batch` endpoint returns 404 on this account, so `scripts/seed.py`
-  executes statements one at a time via `/query`.
-
-## What is NOT done yet (switchover, needs Hall's approval)
-
-- Point the shops' `mcp.json` / `llms.txt` at this Worker and retire
-  GitHub Pages. The old `agent-friendly-mcp` Worker and the Pages site
-  are still the live ones agents see today.
-- Custom domain (deferred by Hall).
-- Test with a real MCP client (Claude Code / Cursor); so far only the
-  raw JSON-RPC client has been used.
-- The daily auto-complete cron trigger is set (02:00 UTC) but has not
-  fired yet; the first run is expected to complete the backdated test
-  order `ord_mwbrfdkxt5m1`.
-- Seller admin is built (`/shops/:shop/admin/` + per-shop API keys);
-  refunds, product listing/unlisting and multi-staff permissions are
-  still future work.
+- [`AGENTS.md`](AGENTS.md) — 本仓库 coding agent 规矩
+- [`docs/refactor-plan.md`](docs/refactor-plan.md) — 重构任务书（Phase 0–6 已完成）
+- [`docs/design-order-tracking-admin.md`](docs/design-order-tracking-admin.md) — 订单跟踪 + 后台设计
+- [`.cursor/skills/deploy-verify/`](.cursor/skills/deploy-verify/) — 部署与冒烟
+- [`.cursor/skills/parity-check/`](.cursor/skills/parity-check/) — 契约抽查

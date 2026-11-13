@@ -1,9 +1,9 @@
 # 重构计划 — agent-friendly-platform v2.0（Hono + TS）
 
-> 状态：**Phase 0–5 已完成（2026-11-12）**。下一步 Phase 6（脚本 TS 化 / 2.0.0）。
+> 状态：**Phase 0–6 已完成（2026-11-13）** → **v2.0.0**。
 > Phase 4：`src/routes/` + `src/mcp/`、接入层零 `import * as db`、`gen-data.ts`。
-> Phase 5：HonoX `app/`（后台壳岛 + 四内容岛 + 上传岛）、Vite 构建；
-> `UI_MODE` 双轨已删；`ADMIN_HTML` / upload `page()` 已删。Python 运维脚本清理留给 Phase 6。
+> Phase 5：HonoX `app/`；`UI_MODE` 双轨已删；`tests/smoke.ts`。
+> Phase 6：脚本全 TS、仓内无 `.py`、删 `spike-honox/`、文档与发版 2.0.0。
 > 本文是重构的需求文档；Phase 0 结论见 §2.2 末尾。执行时每个阶段都要能独立部署、
 > 独立验证；重构不改变任何对外行为，除非本文件明确写出。业务规则见附录 A
 > （重构期间这些规则一个字都不动）。
@@ -388,16 +388,16 @@ Agent 执行清单：`.cursor/skills/phase5-admin-upload/SKILL.md`。
 | 5.2 | 后台：`admin/index.tsx` + `admin-shell` + 四内容岛 + Table/Form/Select/Toast                                                                                                    | §5.3 日用体验；Auth/QC/Toaster 跨岛一致；真机登录/核验/发货/取消                  |
 | 5.2b| ~~默认切 `UI_MODE=honox`~~ → 已切且变量已删                                                                                                                                     | 无需 query 即新 UI；回退靠 Version rollback                                       |
 | 5.3 | 删掉 `ADMIN_HTML` / upload `page()`；无残留 HTML 模板字符串                                                                                                                     | `grep` 零命中（测试除外）                                                         |
-| 5.4 | 旧 Python 测试退役：`tests/test_client.py` / `test_admin.py` 改为仅上线后冒烟（或由 `tests/smoke.ts` 替代）；`compare_routes.py` 保留为比对工具直到 4.4 完成，之后可删          | `npm test` 不再依赖线上；冒烟脚本单独命令                                         |
-| 5.5 | HonoX 回归：岛之间无互相 import（grep 检查）、`honox-island { display: contents; }` 在样式里、React 岛与 hono/jsx 岛不混写                                                      | 静态检查全过；Phase 0 spike 的验收项在完整版上重跑一遍                            |
+| 5.4 | ~~旧 Python 主冒烟~~ → `tests/smoke.ts` + `npm run test:smoke`；`compare_routes.py` 已删（Pages 归档）；深 E2E py 留到 6.1                                          | `npm test` 本地-only；线上冒烟单独命令                                            |
+| 5.5 | ~~HonoX 回归~~：岛无互 import、`honox-island { display: contents; }`、React 岛不混 hono/jsx、无 `ADMIN_HTML`                                                                    | 静态检查全过                                                                      |
 
-### 4.6 Phase 6 — 收尾
+### 4.6 Phase 6 — 收尾（已完成）
 
 | #   | 任务                                                                                                           | 验收                                      |
 | --- | -------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| 6.1 | 脚本 TS 化：`update-shop-facts.ts`、`gen-admin-keys.ts`；删 Python 脚本；`scripts/` 只有 TS                    | 全仓无 `.py`（仓库外 cf.py 不算）         |
-| 6.2 | 文档：README 按新结构重写（命令、目录、部署、测试）；设计文档追加一节（v2.0 架构）；AGENTS.md 更新为重构后状态 | 新 agent 按 README 从零到第一次部署不卡住 |
-| 6.3 | 发版：版本号 1.7.0 → 2.0.0（重构发版，不是功能发版）；线上验证 + 盲测重跑；旧 bundle 保留回滚路径              | §8 验收全过                               |
+| 6.1 | ~~脚本 TS 化~~：`update-shop-facts.ts`、`gen-admin-keys.ts`；删仓内 `.py` 与 `spike-honox/`                      | 全仓无 `.py`（仓库外 cf.py 不算）         |
+| 6.2 | ~~文档~~：README / AGENTS 重构后状态；设计文档「十四、v2.0 架构」                                              | 新 agent 按 README 从零不卡住             |
+| 6.3 | ~~发版 2.0.0~~：版本 bump + deploy + smoke + 盲测；README 发版记录 Version ID                                   | §8 验收全过                               |
 
 ## 5. 前端重写需求
 

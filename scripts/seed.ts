@@ -1,9 +1,9 @@
 #!/usr/bin/env npx tsx
 /**
- * Seed agent-friendly-orders D1 from src/data (Phase 2.4).
+ * Seed agent-friendly-orders D1 from src/data.
  *
- * Statement builders match scripts/seed.py so `--dump` output can be
- * compared line-for-line. Apply uses wrangler (OAuth), not muse tokens.
+ * Apply uses wrangler (OAuth). For partial policy/payment refresh without
+ * replaying seed, use scripts/update-shop-facts.ts.
  *
  * Usage:
  *   npx tsx scripts/seed.ts --dump
@@ -27,9 +27,8 @@ function load<T = Record<string, unknown>>(rel: string): T {
 }
 
 /**
- * Match Python `json.dumps(value)` defaults: ensure_ascii=True,
- * separators=(", ", ": "). Nested JSON columns in D1 must byte-match
- * what seed.py historically wrote.
+ * Nested JSON columns use Python-compatible `json.dumps` defaults
+ * (ensure_ascii=True, separators=(", ", ": ")) for stable D1 bytes.
  */
 function dumps(value: unknown): string {
   const escapeStr = (s: string) => {
@@ -76,7 +75,7 @@ function dumps(value: unknown): string {
   return enc(value);
 }
 
-/** Same INSERT list as scripts/seed.py `build_statements`. */
+/** Build INSERT/REPLACE statements from src/data. */
 export function buildStatements(migrateOrderPath: string | null = null): SeedStmt[] {
   const stmts: SeedStmt[] = [];
   const shopsJson = load<{ shops: Record<string, unknown>[] }>("shops.json");
@@ -299,7 +298,7 @@ function main(): void {
   const opts = parseArgs(process.argv.slice(2));
   const stmts = buildStatements(opts.migrateOrder);
   if (opts.dump) {
-    // One JSON object per line — same shape as scripts/seed.py --dump.
+    // One JSON object per line.
     for (const s of stmts) {
       process.stdout.write(`${JSON.stringify(s)}\n`);
     }

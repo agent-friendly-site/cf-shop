@@ -10,7 +10,7 @@ import { registerShippingTools } from "./tools/shipping";
 export function createMcpServer(env: Env, shop: string) {
   const server = new McpServer({
     name: "agent-friendly-platform",
-    version: "1.7.0",
+    version: "2.0.0",
   });
 
   registerCatalogTools(server, env, shop);

@@ -10,7 +10,6 @@
       "**",
       "!**/*.md",
       "!!**/dist",
-      "!!**/spike-honox",
       "!!**/src/data",
       "!!**/migrations",
       "!!**/drizzle",

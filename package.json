@@ -1,15 +1,15 @@
 {
   "name": "cf-shop",
-  "version": "1.7.0",
+  "version": "2.0.0",
   "description": "agent-friendly multi-merchant platform: one Hono Worker + D1 on Cloudflare. Agent-only storefronts at /shops/:shop/ with llms.txt discovery and a live MCP endpoint.",
   "directories": {
     "test": "tests"
   },
   "scripts": {
-    "import-data": "python3 scripts/import_data.py",
     "gen-data": "npx tsx scripts/gen-data.ts",
     "seed": "npx tsx scripts/seed.ts",
-    "seed:py": "python3 scripts/seed.py",
+    "update-shop-facts": "npx tsx scripts/update-shop-facts.ts",
+    "gen-admin-keys": "npx tsx scripts/gen-admin-keys.ts",
     "build": "vite build --mode client && vite build && node -e \"const fs=require('fs');const p='dist/.assetsignore';const extra=['index.js','wrangler.json','wrangler.toml'];const cur=fs.existsSync(p)?fs.readFileSync(p,'utf8').split(/\\n/):[];fs.writeFileSync(p,[...new Set([...cur.filter(Boolean),...extra])].join('\\n')+'\\n')\"",
     "build:legacy-esbuild": "node scripts/build.mjs",
     "db:generate": "drizzle-kit generate",
@@ -20,7 +20,8 @@
     "dev": "vite",
     "dev:worker": "wrangler dev",
     "test": "vitest run",
-    "test:e2e": "python3 tests/test_client.py",
+    "test:smoke": "npx tsx tests/smoke.ts",
+    "test:e2e": "npm run test:smoke",
     "test:watch": "vitest"
   },
   "keywords": [],

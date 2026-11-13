@@ -5,7 +5,7 @@ import * as catalog from "../services/catalog";
 import { dataFile } from "../static/data";
 
 export const BASE = "https://agent-friendly-platform.refined-x.workers.dev";
-export const VERSION = "1.7.0";
+export const VERSION = "2.0.0";
 
 export type AppEnv = { Bindings: Env };
 export type AppContext = Context<AppEnv>;

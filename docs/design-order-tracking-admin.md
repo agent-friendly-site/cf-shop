@@ -1,8 +1,8 @@
 # 订单自动跟进 + 卖家后台 设计方案
 
-日期：2026-11-11 · 状态：**已实施（v1.2.0，commit 27d1512f）**，2026-11-11 线上验证通过
-对应代码库：`agent-friendly-site/cf-shop`（Worker `agent-friendly-platform`，D1 `agent-friendly-orders`）
-当前版本：openapi 1.1.0，8 个 MCP 工具，订单状态只有 `pending_payment / payment_submitted / paid`
+日期：2026-11-11 · 状态：**已实施**；架构演进见文末 **「十四、v2.0 架构」**
+对应代码库：`cf-shop`（Worker `agent-friendly-platform`，D1 `agent-friendly-orders`，R2 `PROOFS`）
+当前版本：**2.0.0**（13 个 MCP 工具；完整生命周期含 shipped / completed / 15 分钟自动取消）
 
 ## 一、要解决的两个问题
 
@@ -154,3 +154,24 @@ GET/PUT /shops/:shop/admin/api/policies
 - 实现：`db.expireUnpaidOrders`（按 `created_at < now - 15 分钟` 查 `pending_payment`，每单走 `transitionOrder()`，事件 `auto_cancelled`，actor `system`，`cancel_reason` 写明“下单 15 分钟未付款，自动取消”）；Worker 的 `scheduled()` 每分钟跑一次（cron `* * * * *`）。账号是 Workers 免费版（全账号 5 个 cron 触发器上限，已满），所以每日 02:00 的自动完成触发器被每分钟这一个替换了——`scheduled()` 每次触发时两个扫表都跑，自动完成那条查询很便宜、通常查不到东西；`create_order` 返回 `payment_deadline`（15 分钟 + `expires_at`），订单在 `pending_payment` 时带 `payment_expires_at`；`guide.md` / `mcp.json` / `llms.txt` / `agent.json` 都要求 agent 发收款方式时就把 15 分钟期限告诉买家。上传链接还是 7 天有效，但订单 15 分钟后取消了链接也就没用了。
 - 注意：上线时已有的超期未付款订单（包括 Hall 自己的花瓶单 `ord_mwbs00xustqe`，15:06 下单一直没付款）会在第一次扫到时一起自动取消——这是新规则本身的要求，不是误删；要买得重新下单。
 - 无需 migration：过期判断只用已有的 `created_at` 和事件表。
+
+## 十四、v2.0 架构（2026-11-13，重构收尾）
+
+业务规则（状态机、价格、15 分钟 / 7 天、MCP 工具名与描述）相对 v1.7.0 **不变**；变的是代码分层与前端交付。
+
+```
+HTTP / MCP / HonoX 页面
+        ↓
+   services/*          业务编排（订单、付款、后台、目录、定时任务、物流）
+        ↓
+ domain/*  +  db/repositories/*     纯规则     纯 SQL
+```
+
+- **接入层**：`src/routes/*`、`src/mcp/*`、`app/routes/*`。只做校验 → 调 service → 映射错误；禁止直接 import repositories。
+- **领域**：`src/domain/*`（状态机、金额、凭据、错误码）。
+- **数据**：Drizzle schema（`src/db/schema.ts`）+ `drizzle/` 迁移；运行时仍走 D1 `prepare`。
+- **前端**：HonoX（`app/`）SSR + React 岛；卖家后台（`admin-shell` + 四内容岛）与付款截图上传页；岛之间不互 import；共享 Auth bus / QueryClient 单例 / 单 Toaster。
+- **运维**：`scripts/*.ts`（seed / gen-data / update-shop-facts / gen-admin-keys），经 wrangler 写 D1；仓内无 Python。
+- **测试**：本地 Vitest + 线上 `npm run test:smoke`；盲测见 `TEST_PROMPTS.md`。
+
+重构任务书与阶段验收：`docs/refactor-plan.md`（Phase 0–6 完成）。

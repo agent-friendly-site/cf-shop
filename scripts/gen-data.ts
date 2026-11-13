@@ -3,7 +3,7 @@
  * Generate src/static/data.ts: static imports of every file under src/data.
  *
  * esbuild bundles JSON natively and text files via the text loader
- * (see scripts/build.mjs). Regenerate after re-running import_data / shop fact edits.
+ * (see scripts/build.mjs). Regenerate after editing files under src/data.
  *
  * Usage: npx tsx scripts/gen-data.ts
  */

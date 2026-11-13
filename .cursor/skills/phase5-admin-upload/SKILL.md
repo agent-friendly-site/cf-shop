@@ -32,9 +32,25 @@ description: >-
 npx tsc --noEmit
 npm test
 npm run build
+npm run test:smoke
 npm run dev
 # 浏览器：/shops/bean-bloom/admin
 ```
+
+## Phase 5.5 静态检查
+
+```bash
+# 岛之间不许互相 import
+rg "from ['\\\"].*islands/" app/islands || true
+# 无 ADMIN_HTML 残留
+rg "ADMIN_HTML" src/ app/ || true
+# display:contents 必须在
+rg "honox-island" -A2 app/style.css
+# app/ 不混 hono/jsx
+rg "hono/jsx" app/ || true
+```
+
+预期：前三项无互 import / 无 ADMIN_HTML 命中；`style.css` 含 `honox-island { display: contents; }`；`app/` 无 `hono/jsx`。
 
 ## Real-device checklist
 

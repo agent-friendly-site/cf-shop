@@ -1,15 +1,15 @@
 # AGENTS.md — agent-friendly-platform（cf-shop）
 
 给在这个仓库里干活的 coding agent 看的。先读这份文件，再动手。
-业务背景和完整设计见 `README.md` 和 `docs/design-order-tracking-admin.md`；
-重构进行中，见 `docs/refactor-plan.md`（它是当前最高优先级的任务书）。
+业务背景见 `README.md` 和 `docs/design-order-tracking-admin.md`。
+重构（Hono + TS + HonoX）**已完成**（v2.0.0）；历史任务书见 `docs/refactor-plan.md`。
 
 ## 这是什么
 
 单 Cloudflare Worker（Hono）+ D1 + R2 上的多商户 agent 专属商城。
 每个商户是一个 agent-only 店面：`/shops/:shop/`，发现靠 llms.txt，
 下单靠 MCP（`POST /shops/:shop/mcp`），付款线下，凭据靠一次性上传链接。
-当前版本 1.7.0，线上地址：https://agent-friendly-platform.refined-x.workers.dev
+当前版本 **2.0.0**，线上地址：https://agent-friendly-platform.refined-x.workers.dev
 
 三家演示店（数据全是测试数据）：bean-bloom（咖啡）、paper-lantern（文具）、
 terra-pots（陶土）。价格、政策、状态机见 `docs/refactor-plan.md` 附录 A，
@@ -18,136 +18,86 @@ terra-pots（陶土）。价格、政策、状态机见 `docs/refactor-plan.md` 
 ## 常用命令
 
 ```bash
-npm install          # 装依赖
-npm run build        # esbuild 打包到 dist/worker.mjs
-npm run dev          # wrangler dev 本地开发
-npm test             # 本地 Vitest（workers-pool / vitest-plugin + D1）
-npm run test:e2e     # 线上 E2E（Python + curl 打线上 Worker）
-npm run seed -- --local  # 从 src/data 同步到本地 D1（--remote 写生产）
+npm install
+npm run build                 # Vite + HonoX → dist/
+npm run dev
+npm test                      # 本地 Vitest
+npm run test:smoke            # 线上冒烟
+npm run gen-data
+npm run seed -- --local       # 或 --remote
+npm run update-shop-facts -- --local
+npm run gen-admin-keys -- --remote   # 明文只 stdout，勿提交 / 勿随意轮换
 ```
 
-部署：Phase 0 已验证，走 `npx wrangler deploy`（见“部署”一节）；cf.py 仅兜底。
-测试：`npm test` 本地；线上冒烟仍用 `npm run test:e2e` / `tests/test_admin.py`。
+部署：`npm run build && npx wrangler deploy`，然后 `npm run test:smoke`。
+Version ID 记进 `README.md` 发版记录。
 
 ## 目录
 
 ```
+app/               HonoX SSR + React 岛（admin / upload-proof）
 src/
   index.ts         入口：挂 routes + scheduled()
-  routes/          HTTP 接入层（health/shop/orders/admin/upload/mcp + middleware）
+  routes/          HTTP 接入层
   mcp/             MCP server + tools/*（13 工具，描述原样保留）
-  domain/          纯规则：状态机、金额、凭据、错误、常量
-  services/        业务编排（orders/payments/admin/catalog/jobs/shipping）
-  db/
-    schema.ts      Drizzle schema（迁移事实）
-    repositories/  纯数据访问（SQL）；禁止放业务规则
-    index.ts       兼容门面（测试/脚本可用；接入层禁止 import * as db）
-  static/data.ts   生成的静态文件 import map（别手改，用 npm run gen-data）
-  env.ts           Env 类型（DB / PROOFS）
-  data/            店铺事实：商品、价格、政策、guide、mcp.json 等（改事实只改这里）
-drizzle/           D1 migrations（drizzle-kit；旧 0001–0005 在 migrations/archive/）
-tests/             Vitest 本地 + Python 线上 E2E
-scripts/           seed / gen-data.ts / 运维脚本
-spike-honox/       Phase 0 HonoX spike（独立 Worker，不进生产路径）
-wrangler.toml      绑定（D1、R2）和触发器
-biome.json         Biome lint/format
-tsconfig.json      TypeScript strict
+  domain/          纯规则
+  services/        业务编排
+  db/              schema + repositories
+  static/data.ts   生成的静态 import map（npm run gen-data）
+  data/            店铺事实（改事实只改这里）
+drizzle/           D1 migrations
+tests/             Vitest + smoke.ts
+scripts/           seed / gen-data / update-shop-facts / gen-admin-keys（全 TS）
+wrangler.toml
 ```
 
-## Skills（仓库内工作流）
-
-可重复流程写在 `.cursor/skills/`，动手前按任务读对应 `SKILL.md`：
+## Skills
 
 | Skill | 何时用 |
 | --- | --- |
 | `deploy-verify` | 构建部署、线上冒烟、回滚 |
-| `parity-check` | 店铺路由/MCP/后台 API 契约比对 |
+| `parity-check` | 店铺发现面 / MCP / 后台 API 契约 |
 | `phase5-admin-upload` | Phase 5 后台+上传页（历史清单；双轨已结束） |
-
-Phase 5 切流记录（已切 HonoX、双轨已删）：`docs/phase5-ui-cutover.md`。
 
 ## 规矩
 
 1. **对外契约不动**：路由、MCP 工具名/参数、店铺文件路径、订单状态机、
- 价格/政策/时限（15 分钟、7 天）——改之前先确认，不许“顺手优化”。
-2. **重构 commit 不混行为改动**：一个 commit 只做一件事；行为改动单独 commit。
-3. **分层调用（Phase 3.x 起强制）**：
-   - `routes` / `mcp` / `admin` / `proof_upload` → 只调 `services/*`
+   价格/政策/时限（15 分钟、7 天）——改之前先确认，不许“顺手优化”。
+2. **commit 不混行为与重构**：一个 commit 只做一件事。
+3. **分层调用**：
+   - `routes` / `mcp` / `app` → 只调 `services/*`
    - `services/*` → 可调 `domain/*` + `db/repositories/*`
-   - **禁止**接入层 `import` repositories；**禁止** repository 里写状态机/金额校验
-   - 接入层（`routes/` / `mcp/` / `index.ts`）禁止 `import * as db`；禁止 import repositories
-   - 边界错误：服务抛 `DomainError`；HTTP 用 `toHttpError`，MCP 用 `toMcpError`
-   - 静态 map：`npm run gen-data` → `src/static/data.ts`（不要再跑 gen_data_module.py）
-4. **改店铺事实只改 `src/data/`**，再跑同步脚本写 D1；不要直接改 D1 里的商品数据。
-5. **不要把密钥、token、后台 key 明文写进仓库、记忆或代码**。
-   后台 key 只给过 Hall 一次，丢了就重新生成，不要为了测试去轮换他的 key。
-6. **D1 里的订单全是测试单**，交易单号全是测试号；不要当成真实订单。
-7. **前端页面改动必须真机验证**：`npx tsc --noEmit` 通过后，再用浏览器
-   实际点一遍（登录、主流程、一个失败分支）。只测 API 不算验证通过。
-   前端走 HonoX（React 岛 + Tailwind + shadcn/ui），见 `docs/refactor-plan.md`
-   §2.1–§2.2、§5.4：岛之间不许互相 import，`honox-island { display: contents; }`
-   不许删，React 岛与 hono/jsx 岛不混写。
-8. **声称完成前先线上验证**：部署后读线上实际返回（/health、工具列表、
-   店铺文件），不要只凭本地构建成功就汇报。Pages/部署有同步延迟，
-   没刷出来就明说，不要硬说成功了。
-9. **测试先行**：改订单流、金额、时限这类逻辑，先跑 `npm test`；
-   改后台再补 `tests/test_admin.py`；新行为要补测试 prompt 到 `TEST_PROMPTS.md`。
+   - 接入层禁止 `import` repositories / `import * as db`
+   - 边界错误：服务抛 `DomainError`；HTTP `toHttpError`，MCP `toMcpError`
+4. **改店铺事实只改 `src/data/`**，再 `gen-data` / `seed` 或 `update-shop-facts`。
+5. **不要把密钥、token、后台 key 明文写进仓库**。丢了再 `gen-admin-keys`，
+   不要为了测试去轮换 Hall 的 key。
+6. **D1 订单全是测试单**。
+7. **前端改动必须真机验证**：`tsc` 不够；岛之间不许互相 import；
+   `honox-island { display: contents; }` 不许删。
+8. **声称完成前先线上验证**：部署后读实际返回 / 跑 `test:smoke`。
+9. **测试先行**：逻辑改动先 `npm test`；部署后 `test:smoke`；
+   新行为补 `TEST_PROMPTS.md`。
 
 ## 部署
 
-- Worker 名 `agent-friendly-platform`，账号 `b74b5f1383b4c12d7d98a26b462e7c22`，
-  D1 `agent-friendly-orders`（`dd3c36b4-a260-4fc5-9da2-b9b06ccfb1cc`），
-  R2 `agent-friendly-proofs`（绑定 `PROOFS`）。
-- 部署命令（构建 + 上传；`wrangler.toml` 已含 D1/R2/cron）：
+- Worker `agent-friendly-platform`；D1 `agent-friendly-orders`；R2 `PROOFS`
+- `npx wrangler login` 后 `npm run build && npx wrangler deploy`
+- 每次部署记下 Version ID → `README.md` 发版记录
+- GitHub 推送走 snapshot-push（本仓库未必是标准 git checkout）
 
-  ```bash
-  npm run build
-  npx wrangler deploy
-  ```
+## 坑
 
-  需先 `npx wrangler login`（OAuth；token 不进仓库）。WSL 与 Windows
-  的 wrangler 凭证目录不同，换环境要重新 login 或同步 config。
-- Phase 0（2026-11-11）已验证 wrangler 可用；cf.py `worker-put` 保留为兜底，
-  不再作为默认路径。详见 `docs/refactor-plan.md` §2.2。
-- 每次部署记下返回的 Version ID / deployment_id，回滚就靠它。
-- 推送到 GitHub 用 snapshot-push 流程（本仓库不是 git checkout）：
-  先读 `/opt/hatch/connectors/github/references/snapshot-push.md`，
-  按那份流程走：核对远端 head、更新 `~/workspace/cf-shop-paths.txt` 清单、
-  推送成功后把确认的 commit SHA 写进 `~/workspace/cf-shop.muse-github-snapshot-sync.json`。
-  只有 GitHub 确认的 SHA 才能写进同步记录。
-
-## 坑（都是真金白银踩出来的，别再踩）
-
-- **HTML 别放进 JS 模板字符串**：`ADMIN_HTML` 里的 `\'` / `\"` 转义会被剥掉，
-  导致整个页面脚本解析失败（`doLogin is not defined`，2026-11-11）。
-  前端重构（`docs/refactor-plan.md` §5）就是为了根除它：页面改走 HonoX，
-  不再有模板字符串里的 HTML。
-- **D1 `/batch` 在这个账号上 404**：写 D1 一次只调一条语句。
-- **cron 触发器**：账号免费版上限 5 个/账号，已满；本 Worker 只有 1 个触发器
-  （每分钟 `* * * * *`）。新建/修改触发器后要等约 15 分钟才会第一次触发，
-  别刚建完就断定它坏了。现在由 `wrangler.toml` `[triggers]` + `wrangler deploy`
-  应用；若走 API，PUT body 是裸 JSON 数组 `[{"cron": "..."}]`，不是
-  `{"schedules": [...]}`。
-- **workers.dev 有 Browser Integrity Check**：自动化请求要带浏览器 UA。
-- **MCP 没有图片上传**：买家截图走一次性上传链接（v1.6.0），不许改回让 agent 读图。
-- **文字规则卡不住流程**：v1.4.1 的“下单前必须问地址”被盲测绕过，
-  最后是把 `shipping_address` 做成工具层必填才卡住的。
-  凡是“必须”，一律在工具/服务层用代码卡，不要只写进提示词。
-- **跟踪只在交凭据后开始**（每 6 小时查一次）；取消订单要删跟踪任务。
-- **上传链接 7 天有效但订单 15 分钟就过期**：链接要在 15 分钟付款窗口内用。
-- **盲测要找没看过设计的 fresh agent**：自己测自己设计的流程不算盲测。
-- **GitHub Pages 已归档**：不要再往 `agent-friendly-site.github.io` 推东西；
-  那个仓库的 Pages 还等 Hall 手动关掉。
+- D1 `/batch` 在此账号 404：一次一条语句（脚本走 wrangler `--file`）
+- cron 免费版上限 5/账号已满；本 Worker 仅 `* * * * *`
+- workers.dev 要浏览器 UA
+- MCP 无图片上传：买家走上传链接
+- “必须”用代码卡在工具/服务层，不要只写提示词
+- GitHub Pages 已归档：勿再推 Pages；关站点仍等 Hall
 
 ## 当前状态
 
-- v1.7.0 已上线：15 分钟未付款自动取消、上传链接交截图、卖家核验、
-  跟踪 + 后台管理。全部功能见 `README.md` 的版本记录。
-- 重构：`docs/refactor-plan.md`。**Phase 0–5 完成**（含 3.x 收口）。
-  Phase 4：`routes/` + `mcp/tools/*`、鉴权中间件、接入层全调 services、
-  `scripts/gen-data.ts` → `src/static/data.ts`。
-  Phase 5：HonoX（pin 0.1.62）+ React 岛 + Tailwind v4 + shadcn；
-  `app/server.ts` 入口；`UI_MODE` 双轨已删；`ADMIN_HTML` / upload `page()` 已删。
-  Admin UX 精修（P0→P1）：`admin-shell`、共享 Auth/QC/Toaster、深链与中文状态。
-  下一步 Phase 6（脚本收尾 / 2.0.0）。
-- 待 Hall 手动做的事：关 GitHub Pages；`TEST_PROMPTS` 关键路径。
+- **v2.0.0**：重构收尾完成（Phase 0–6）。全仓无 `.py`；HonoX 后台/上传；
+  运维脚本全 TS；线上冒烟 `tests/smoke.ts`。
+- 待 Hall：关 GitHub Pages；`TEST_PROMPTS` 关闭路径 1–18（现文件从 19 起，
+  盲测至少 25–27）。
