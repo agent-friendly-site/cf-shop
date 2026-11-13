@@ -6,6 +6,7 @@
 //
 // Phase 5: GET HTML is app/routes/.../upload-proof; POST stays here for the island + agents.
 import type { Hono } from "hono";
+import { canSubmitProof } from "../domain/payment";
 import * as catalog from "../services/catalog";
 import * as orders from "../services/orders";
 import * as payments from "../services/payments";
@@ -39,7 +40,7 @@ export function registerProofUploadRoutes(app: Hono<AppEnv>, opts: RegisterUploa
       if (!order || order.shop !== slug) return c.text("订单不存在", 404);
       const valid = await payments.verifyProofUploadToken(c.env.DB, { shop: slug, orderId, token });
       if (!valid) return c.text("上传链接无效", 403);
-      if (!["pending_payment", "payment_submitted"].includes(order.status)) {
+      if (!canSubmitProof(order.status)) {
         return c.text("订单已不需要凭据", 400);
       }
       return c.text("ok", 200);
@@ -59,11 +60,14 @@ export function registerProofUploadRoutes(app: Hono<AppEnv>, opts: RegisterUploa
     const tokenRow = await requireProofUploadToken(c, { shop: slug, orderId, token });
     if (!tokenRow) {
       return c.json(
-        { error: "这个上传链接无效。链接可能已过期、已经用过，或者地址不对。请重新向你的 Agent 要一个新的上传链接。" },
+        {
+          error:
+            "这个上传链接无效。链接可能已过期、已经用过，或者地址不对。请重新向你的 Agent 要一个新的上传链接。",
+        },
         403,
       );
     }
-    if (!["pending_payment", "payment_submitted"].includes(order.status)) {
+    if (!canSubmitProof(order.status)) {
       return c.json({ error: `这个订单已经不需要付款凭据了（状态：${order.status}）` }, 400);
     }
     let body: Awaited<ReturnType<typeof c.req.parseBody>>;

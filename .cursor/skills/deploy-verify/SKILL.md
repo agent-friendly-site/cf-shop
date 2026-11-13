@@ -80,7 +80,7 @@ description: >-
 
    - `npx tsc --noEmit` 不够
    - 真机浏览器点：登录、主流程、一个失败分支
-   - 只测 API 不算通过（见 `AGENTS.md` / `docs/refactor-plan.md` §5）
+   - 只测 API 不算通过（见 `AGENTS.md` / `docs/archive/refactor-plan.md` §5）
 
 6. **汇报格式**
 

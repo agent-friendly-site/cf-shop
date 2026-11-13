@@ -1,7 +1,7 @@
 # agent-friendly-platform
 
 Cloudflare 上的多商户 **agent 专属商城**：单 Hono Worker + D1 + R2。  
-Live: https://agent-friendly-platform.refined-x.workers.dev · **v2.0.0**
+Live: https://agent-friendly-platform.refined-x.workers.dev · **v2.0.1**
 
 - 店面：`/shops/:shop/`（无人类购物 UI）；发现靠 `llms.txt`
 - MCP：`POST /shops/:shop/mcp`（Streamable HTTP，13 工具）
@@ -35,7 +35,14 @@ Worker agent-friendly-platform
 ```
 
 分层：`routes` / `mcp` / `app` → `services` → `domain` + `db/repositories`。  
-细节见 `docs/design-order-tracking-admin.md`（含 v2.0 架构节）与 `docs/refactor-plan.md`。
+细节见 `docs/design-order-tracking-admin.md`（含 v2.0 架构节）与 `docs/archive/refactor-plan.md`。
+
+## D1 migrations
+
+- **现行**：`drizzle/`（`wrangler.toml` `migrations_dir`）；schema 源 `src/db/schema.ts`
+- **本地应用**：`npm run db:migrate:local`（或 `npx wrangler d1 migrations apply agent-friendly-orders --local`）
+- **历史手写 SQL**：`migrations/archive/`（0001–0005）只读史料，**勿 apply**
+- Vitest 通过 `@cloudflare/vitest-plugin` 的 `readD1Migrations("drizzle")` 在 miniflare 里应用同一套
 
 ## Commands
 
@@ -73,22 +80,23 @@ npm run test:smoke
 
 | 层 | 命令 | 范围 |
 | --- | --- | --- |
-| 本地 | `npm test` | 状态机 / 金额 / 鉴权 / MCP tools/list / jobs |
-| 线上冒烟 | `npm run test:smoke` | health、发现面、13 tools、admin 壳 |
-| 盲测 | `TEST_PROMPTS.md` | fresh agent；至少 25–27（见文件缺口说明） |
+| 本地 | `npm test` | 状态机 / 金额 / 鉴权 / MCP tools/list+call / upload / jobs |
+| 线上冒烟 | `npm run test:smoke` | health、发现面、13 tools、admin 壳、products.json |
+| 盲测 | `TEST_PROMPTS.md` | fresh agent；至少 25–27（1–18 不可恢复） |
 | 真机 | 浏览器 | 后台登录 / 核验 / 发货；上传页主路径 |
 
 ## 发版记录
 
 | 版本 | 日期 | Version ID | 说明 |
 | --- | --- | --- | --- |
+| 2.0.1 | 2026-11-13 | `0fe3c949-d715-4a93-8b06-61f095aaef71` | Review 收口：凭据提交走 `transitionOrder`、拆 `db/shared`、MCP tools/call + upload/cookie 测、smoke 抽查 products.json、删 legacy esbuild、文档归档（上一版 `86d53011-1153-4246-b86e-4b5ce19657fa`） |
 | 2.0.0 | 2026-11-13 | `86d53011-1153-4246-b86e-4b5ce19657fa` | 重构收尾：全 TS 脚本、HonoX 后台、无仓内 `.py`（上一版 `740d2bec-a9f5-465c-8837-4eb37cf2b322`）。smoke 过；平台侧核对 prompt 25/26/27（缺地址拒单、upload link、15 分钟 deadline）；fresh-agent 盲测仍待 Hall |
 | 1.7.0 | 2026-11-11 | — | 15 分钟未付款自动取消等（见 git 历史） |
 
 ## Docs for agents
 
 - [`AGENTS.md`](AGENTS.md) — 本仓库 coding agent 规矩
-- [`docs/refactor-plan.md`](docs/refactor-plan.md) — 重构任务书（Phase 0–6 已完成）
 - [`docs/design-order-tracking-admin.md`](docs/design-order-tracking-admin.md) — 订单跟踪 + 后台设计
+- [`docs/archive/`](docs/archive/) — 已完成重构任务书 / Phase 5 切流记录
 - [`.cursor/skills/deploy-verify/`](.cursor/skills/deploy-verify/) — 部署与冒烟
 - [`.cursor/skills/parity-check/`](.cursor/skills/parity-check/) — 契约抽查

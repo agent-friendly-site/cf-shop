@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Product } from "../db/shared";
+import type { Product } from "../db/types";
 
 export const ItemShape = z.object({
   product_id: z.string(),

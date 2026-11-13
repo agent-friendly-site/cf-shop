@@ -12,7 +12,8 @@ export function registerMcpRoutes(app: Hono<AppEnv>) {
     const shop = await shopOr404(c, slug);
     if (!shop) return notFound(c, `unknown shop: ${slug}`);
     const transport = new WebStandardStreamableHTTPServerTransport();
-    const server = createMcpServer(c.env, slug);
+    const publicOrigin = new URL(c.req.url).origin;
+    const server = createMcpServer(c.env, slug, { publicOrigin });
     await server.connect(transport);
     return transport.handleRequest(c.req.raw);
   });

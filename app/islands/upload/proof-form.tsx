@@ -6,7 +6,13 @@ import { Controller, useForm } from "react-hook-form";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { Label } from "@/app/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/app/components/ui/select";
 import { Toaster } from "@/app/components/ui/toast";
 import { getQueryClient } from "@/app/lib/query-client";
 import { type ProofUploadValues, proofUploadSchema } from "@/app/lib/schemas";
@@ -184,11 +190,23 @@ function ProofFormInner(props: ProofFormProps) {
         </div>
         <div>
           <Label htmlFor="transaction_id">交易单号（可选）</Label>
-          <Input id="transaction_id" className="mt-1" autoComplete="off" {...register("transaction_id")} />
+          <Input
+            id="transaction_id"
+            className="mt-1"
+            autoComplete="off"
+            {...register("transaction_id")}
+          />
         </div>
         <div>
           <Label htmlFor="amount_cny">付款金额（元，可选）</Label>
-          <Input id="amount_cny" className="mt-1" type="number" min={0} step="0.01" {...register("amount_cny")} />
+          <Input
+            id="amount_cny"
+            className="mt-1"
+            type="number"
+            min={0}
+            step="0.01"
+            {...register("amount_cny")}
+          />
         </div>
         <div>
           <Label htmlFor="file">付款截图（图片，5MB 以内）</Label>
@@ -214,7 +232,9 @@ function ProofFormInner(props: ProofFormProps) {
               <button
                 type="button"
                 className="ml-2 underline"
-                onClick={() => setValue("file", undefined as unknown as File, { shouldValidate: true })}
+                onClick={() =>
+                  setValue("file", undefined as unknown as File, { shouldValidate: true })
+                }
               >
                 清除
               </button>

@@ -1,12 +1,12 @@
 /** @jsxImportSource react */
 import { createRoute } from "honox/factory";
+import type { AppEnv } from "../../../../../src/routes/helpers";
+import * as catalog from "../../../../../src/services/catalog";
 import AdminShell from "../../../../islands/admin/admin-shell";
 import OrderDetail from "../../../../islands/admin/order-detail";
 import OrderList from "../../../../islands/admin/order-list";
 import PoliciesEditor from "../../../../islands/admin/policies-editor";
 import ProductsEditor from "../../../../islands/admin/products-editor";
-import type { AppEnv } from "../../../../../src/routes/helpers";
-import * as catalog from "../../../../../src/services/catalog";
 
 export default createRoute(async (c) => {
   const ctx = c as typeof c & { env: AppEnv["Bindings"] };

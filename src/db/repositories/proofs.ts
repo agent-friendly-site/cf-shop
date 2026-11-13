@@ -1,57 +1,61 @@
 /**
  * Payment-proof data access (Phase 3.x harden).
  * Token/proof SQL only. Domain rules live in services/payments.ts.
+ * Status transitions must go through services/orders.transitionOrder — not here.
  */
 import type { UploadTokenRow } from "../../domain/payment";
-import { sha256Hex, writeEvent } from "../shared";
+import { sha256Hex } from "../helpers";
 
-export function proofUploadUrl(shop: string, orderId: string, token: string): string {
-  return `https://agent-friendly-platform.refined-x.workers.dev/shops/${shop}/orders/${orderId}/upload-proof?token=${token}`;
+const DEFAULT_PUBLIC_ORIGIN = "https://agent-friendly-platform.refined-x.workers.dev";
+
+export function proofUploadUrl(
+  shop: string,
+  orderId: string,
+  token: string,
+  baseUrl: string = DEFAULT_PUBLIC_ORIGIN,
+): string {
+  const origin = baseUrl.replace(/\/$/, "");
+  return `${origin}/shops/${shop}/orders/${orderId}/upload-proof?token=${token}`;
 }
 
-export async function insertTextPaymentProof(
+/** Prepare a text proof INSERT (for batching with a status transition). */
+export function prepareTextPaymentProofInsert(
   db: D1Database,
   {
     orderId,
     paymentMethod,
     transactionId,
     amountCny,
-    wasPending,
   }: {
     orderId: string;
     paymentMethod: string;
     transactionId: string;
     amountCny: number;
-    wasPending: boolean;
   },
-): Promise<void> {
+): D1PreparedStatement {
   const now = new Date().toISOString();
   const id = `proof_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-  const insert = db
+  return db
     .prepare(
       "INSERT INTO payment_proofs (id, order_id, payment_method, transaction_id, amount_cny, created_at) VALUES (?, ?, ?, ?, ?, ?)",
     )
     .bind(id, orderId, paymentMethod, transactionId, amountCny, now);
-  if (wasPending) {
-    const update = db
-      .prepare("UPDATE orders SET status = 'payment_submitted', updated_at = ? WHERE id = ?")
-      .bind(now, orderId);
-    const evt = writeEvent(db, {
-      orderId,
-      event: "payment_proof_submitted",
-      fromStatus: "pending_payment",
-      toStatus: "payment_submitted",
-      actor: "buyer",
-      note: `${paymentMethod} ${transactionId}`,
-      now,
-    });
-    await db.batch([insert, update, evt]);
-  } else {
-    await insert.run();
-  }
 }
 
-export async function insertImagePaymentProof(
+export async function insertTextPaymentProof(
+  db: D1Database,
+  args: {
+    orderId: string;
+    paymentMethod: string;
+    transactionId: string;
+    amountCny: number;
+  },
+): Promise<void> {
+  await prepareTextPaymentProofInsert(db, args).run();
+}
+
+/** Prepare an image proof INSERT (for batching with a status transition). */
+export function prepareImagePaymentProofInsert(
   db: D1Database,
   {
     orderId,
@@ -62,7 +66,6 @@ export async function insertImagePaymentProof(
     r2Key,
     transactionId,
     amountCny,
-    wasPending,
   }: {
     orderId: string;
     paymentMethod: string;
@@ -72,12 +75,11 @@ export async function insertImagePaymentProof(
     r2Key: string;
     transactionId: string | null;
     amountCny: number | null;
-    wasPending: boolean;
   },
-): Promise<void> {
+): D1PreparedStatement {
   const now = new Date().toISOString();
   const id = `proof_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-  const insert = db
+  return db
     .prepare(
       "INSERT INTO payment_proofs (id, order_id, payment_method, transaction_id, amount_cny, proof_type, r2_key, file_name, mime_type, file_size, created_at) VALUES (?, ?, ?, ?, ?, 'image', ?, ?, ?, ?, ?)",
     )
@@ -93,24 +95,22 @@ export async function insertImagePaymentProof(
       fileSize,
       now,
     );
-  const note = `图片凭据 ${fileName}${transactionId ? ` · 单号 ${transactionId}` : ""}`;
-  if (wasPending) {
-    const update = db
-      .prepare("UPDATE orders SET status = 'payment_submitted', updated_at = ? WHERE id = ?")
-      .bind(now, orderId);
-    const evt = writeEvent(db, {
-      orderId,
-      event: "payment_proof_submitted",
-      fromStatus: "pending_payment",
-      toStatus: "payment_submitted",
-      actor: "buyer",
-      note,
-      now,
-    });
-    await db.batch([insert, update, evt]);
-  } else {
-    await insert.run();
-  }
+}
+
+export async function insertImagePaymentProof(
+  db: D1Database,
+  args: {
+    orderId: string;
+    paymentMethod: string;
+    fileName: string;
+    mimeType: string;
+    fileSize: number;
+    r2Key: string;
+    transactionId: string | null;
+    amountCny: number | null;
+  },
+): Promise<void> {
+  await prepareImagePaymentProofInsert(db, args).run();
 }
 
 export async function insertProofUploadToken(

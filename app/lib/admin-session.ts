@@ -54,10 +54,14 @@ export function useAdminSession(shop: string) {
     return res.ok;
   }, [shop]);
 
-  useEffect(() => subscribeAdminAuth((s) => {
-    setReady(s.ready);
-    setAuthed(s.authed);
-  }), []);
+  useEffect(
+    () =>
+      subscribeAdminAuth((s) => {
+        setReady(s.ready);
+        setAuthed(s.authed);
+      }),
+    [],
+  );
 
   useEffect(() => {
     void refreshMe();

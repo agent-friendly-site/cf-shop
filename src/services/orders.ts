@@ -4,15 +4,13 @@
  * Callers (routes / MCP / admin) should use this module — not repositories.
  */
 import * as ordersRepo from "../db/repositories/orders";
+import type { Order, OrderItemInput, Product } from "../db/types";
 import {
   AUTO_COMPLETE_AFTER_DAYS,
-  DomainRpcError,
-  type Order,
-  type OrderItemInput,
   type OrderStatus,
-  type Product,
   UNPAID_EXPIRY_MINUTES,
-} from "../db/shared";
+} from "../domain/constants";
+import { DomainRpcError } from "../domain/errors";
 import { totals as computeTotals, type OrderTotals } from "../domain/money";
 import { assertCanTransition, canUpdateBuyerInfo } from "../domain/order";
 
@@ -32,9 +30,10 @@ export async function transitionOrder(
   actor: string,
   note: string | null,
   extra: Record<string, unknown> = {},
+  extraStmts: D1PreparedStatement[] = [],
 ): Promise<Order | null> {
   assertCanTransition(order.id, order.status, toStatus);
-  return ordersRepo.persistTransition(db, order, toStatus, event, actor, note, extra);
+  return ordersRepo.persistTransition(db, order, toStatus, event, actor, note, extra, extraStmts);
 }
 
 export async function createOrder(

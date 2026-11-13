@@ -1,12 +1,17 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { toMcpError } from "../../domain/errors";
+import { DomainRpcError, toMcpError } from "../../domain/errors";
 import type { Env } from "../../env";
 import * as orders from "../../services/orders";
 import * as payments from "../../services/payments";
 import { mcpText } from "../shared";
 
-export function registerPaymentTools(server: McpServer, env: Env, shop: string) {
+export function registerPaymentTools(
+  server: McpServer,
+  env: Env,
+  shop: string,
+  publicOrigin: string,
+) {
   server.registerTool(
     "submit_payment_proof",
     {
@@ -22,14 +27,14 @@ export function registerPaymentTools(server: McpServer, env: Env, shop: string) 
     },
     async ({ order_id, payment_method, transaction_id, amount_cny }) => {
       try {
-        if (!transaction_id) throw new Error("transaction_id is required");
+        if (!transaction_id) throw new DomainRpcError("transaction_id is required", -32602);
         const order = await payments.addPaymentProof(env.DB, {
           orderId: order_id,
           paymentMethod: payment_method,
           transactionId: transaction_id,
           amountCny: amount_cny,
         });
-        if (!order) throw new Error(`unknown order_id: ${order_id}`);
+        if (!order) throw new DomainRpcError(`unknown order_id: ${order_id}`, -32602);
         return mcpText({
           order,
           verification:
@@ -56,10 +61,14 @@ export function registerPaymentTools(server: McpServer, env: Env, shop: string) 
     async ({ order_id }) => {
       try {
         const order = await orders.getOrder(env.DB, order_id);
-        if (!order) throw new Error(`unknown order_id: ${order_id}`);
+        if (!order) throw new DomainRpcError(`unknown order_id: ${order_id}`, -32602);
         if (order.shop !== shop)
-          throw new Error(`order ${order_id} does not belong to shop ${shop}`);
-        const link = await payments.createProofUploadToken(env.DB, { shop, orderId: order_id });
+          throw new DomainRpcError(`order ${order_id} does not belong to shop ${shop}`, -32602);
+        const link = await payments.createProofUploadToken(env.DB, {
+          shop,
+          orderId: order_id,
+          baseUrl: publicOrigin,
+        });
         return mcpText({
           order_id,
           shop,

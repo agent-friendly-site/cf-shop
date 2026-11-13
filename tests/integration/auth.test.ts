@@ -1,6 +1,6 @@
 import { env, SELF } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
-import { sha256Hex } from "../../src/db/shared";
+import { sha256Hex } from "../../src/db/helpers";
 import * as orders from "../../src/services/orders";
 import * as payments from "../../src/services/payments";
 
@@ -180,5 +180,133 @@ describe("admin + proof-upload auth", () => {
     expect(res.status).toBe(403);
     const html = await res.text();
     expect(html).toMatch(/上传链接无效/);
+  });
+
+  it("login sets af_admin cookie and me accepts it", async () => {
+    const bad = await SELF.fetch(`https://example.com/shops/${SHOP}/admin/api/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: "wrong-key" }),
+    });
+    expect(bad.status).toBe(401);
+
+    const login = await SELF.fetch(`https://example.com/shops/${SHOP}/admin/api/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: ADMIN_KEY }),
+    });
+    expect(login.status).toBe(200);
+    const setCookie = login.headers.get("Set-Cookie") || "";
+    expect(setCookie).toMatch(/af_admin=/);
+    expect(setCookie).toMatch(new RegExp(`Path=/shops/${SHOP}/admin`));
+    const token = /af_admin=([^;]+)/.exec(setCookie)?.[1];
+    expect(token).toBeTruthy();
+
+    const me = await SELF.fetch(`https://example.com/shops/${SHOP}/admin/api/me`, {
+      headers: { Cookie: `af_admin=${token}` },
+    });
+    expect(me.status).toBe(200);
+    const body = (await me.json()) as { shop: string };
+    expect(body.shop).toBe(SHOP);
+  });
+
+  it("confirm-payment rejects amount mismatch (400)", async () => {
+    const products = [
+      {
+        id: "bb-yirg-250",
+        name: "Yirgacheffe",
+        name_zh: "耶加雪菲",
+        price: 68,
+        currency: "CNY",
+        stock: 20,
+        description: "t",
+        shop: SHOP,
+      },
+    ];
+    const total = orders.totals([{ product_id: "bb-yirg-250", quantity: 1 }], products);
+    const created = await orders.createOrder(env.DB, {
+      shop: SHOP,
+      items: [{ product_id: "bb-yirg-250", quantity: 1 }],
+      total,
+      idempotencyKey: `idem-auth-confirm-${Date.now()}`,
+      shippingAddress: "测试地址",
+    });
+    const orderId = created.order?.id as string;
+    await payments.addPaymentProof(env.DB, {
+      orderId,
+      paymentMethod: "wechat",
+      transactionId: "wx_mismatch",
+      amountCny: total.total_cny,
+    });
+
+    const res = await SELF.fetch(
+      `https://example.com/shops/${SHOP}/admin/api/orders/${orderId}/confirm-payment`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${ADMIN_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ verified_amount_cny: total.total_cny - 1 }),
+      },
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toMatch(/does not match order total/);
+  });
+
+  it("accepts proof upload POST with valid token (200)", async () => {
+    const products = [
+      {
+        id: "bb-yirg-250",
+        name: "Yirgacheffe",
+        name_zh: "耶加雪菲",
+        price: 68,
+        currency: "CNY",
+        stock: 20,
+        description: "t",
+        shop: SHOP,
+      },
+    ];
+    const total = orders.totals([{ product_id: "bb-yirg-250", quantity: 1 }], products);
+    const created = await orders.createOrder(env.DB, {
+      shop: SHOP,
+      items: [{ product_id: "bb-yirg-250", quantity: 1 }],
+      total,
+      idempotencyKey: `idem-auth-upload-ok-${Date.now()}`,
+      shippingAddress: "测试地址",
+    });
+    const orderId = created.order?.id as string;
+    const link = await payments.createProofUploadToken(env.DB, {
+      shop: SHOP,
+      orderId,
+      baseUrl: "https://example.com",
+    });
+
+    const form = new FormData();
+    form.append(
+      "file",
+      new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], "pay.png", { type: "image/png" }),
+    );
+    form.append("payment_method", "alipay");
+
+    const res = await SELF.fetch(
+      `https://example.com/shops/${SHOP}/orders/${orderId}/upload-proof?token=${link.token}`,
+      { method: "POST", body: form },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { ok: boolean; status: string; order_id: string };
+    expect(body.ok).toBe(true);
+    expect(body.status).toBe("payment_submitted");
+    expect(body.order_id).toBe(orderId);
+
+    const order = await orders.getOrder(env.DB, orderId);
+    expect(order?.status).toBe("payment_submitted");
+    expect(order?.proofs.some((p) => p.proof_type === "image")).toBe(true);
+    expect(
+      order?.timeline.some(
+        (e) => e.event === "payment_proof_submitted" && e.to_status === "payment_submitted",
+      ),
+    ).toBe(true);
   });
 });

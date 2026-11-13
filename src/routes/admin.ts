@@ -7,7 +7,7 @@
 // the admin is for the human seller, not for buyers' agents.
 import type { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import type { Order, ShopPolicies } from "../db/shared";
+import type { Order, ShopPolicies } from "../db/types";
 import { toHttpError } from "../domain/errors";
 import * as adminService from "../services/admin";
 import * as catalog from "../services/catalog";

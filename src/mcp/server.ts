@@ -7,15 +7,20 @@ import { registerOrderTools } from "./tools/orders";
 import { registerPaymentTools } from "./tools/payments";
 import { registerShippingTools } from "./tools/shipping";
 
-export function createMcpServer(env: Env, shop: string) {
+export type McpServerOptions = {
+  /** Public origin for proof-upload links (from the incoming request). */
+  publicOrigin: string;
+};
+
+export function createMcpServer(env: Env, shop: string, opts: McpServerOptions) {
   const server = new McpServer({
     name: "agent-friendly-platform",
     version: "2.0.0",
   });
 
   registerCatalogTools(server, env, shop);
-  registerOrderTools(server, env, shop);
-  registerPaymentTools(server, env, shop);
+  registerOrderTools(server, env, shop, opts.publicOrigin);
+  registerPaymentTools(server, env, shop, opts.publicOrigin);
   registerShippingTools(server, env, shop);
 
   return server;

@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { Product } from "../../db/shared";
-import { toMcpError } from "../../domain/errors";
+import type { Product } from "../../db/types";
+import { DomainRpcError, toMcpError } from "../../domain/errors";
 import type { Env } from "../../env";
 import * as catalog from "../../services/catalog";
 import * as orders from "../../services/orders";
@@ -35,7 +35,7 @@ export function registerCatalogTools(server: McpServer, env: Env, shop: string) 
     async ({ product_id }) => {
       try {
         const p = await catalog.getProduct(env.DB, shop, product_id);
-        if (!p) throw new Error(`unknown product_id: ${product_id}`);
+        if (!p) throw new DomainRpcError(`unknown product_id: ${product_id}`, -32602);
         return mcpText({ shop, product: publicProduct(p) });
       } catch (e) {
         return toMcpError(e);

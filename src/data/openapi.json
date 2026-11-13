@@ -1,36 +1,35 @@
 {
-  "openapi": "3.1.0",
-  "info": {
-    "title": "agent-friendly-site — Platform API ",
-    "version": "1.7.0",
-    "description": "platform index. Shop APIs live at /shops/:shop/openapi.json."
-  },
-  "servers": [
-    {
-      "url": "https://agent-friendly-platform.refined-x.workers.dev"
+ "openapi": "3.1.0",
+ "info": {
+  "title": "agent-friendly-site — Platform API ",
+  "version": "2.0.0",
+  "description": "platform index. Shop APIs live at /shops/:shop/openapi.json."
+ },
+ "servers": [
+  {
+   "url": "https://agent-friendly-platform.refined-x.workers.dev"
+  }
+ ],
+ "paths": {
+  "/shops.json": {
+   "get": {
+    "operationId": "listShops",
+    "responses": {
+     "200": {
+      "description": "Shop list"
+     }
     }
-  ],
-  "paths": {
-    "/shops.json": {
-      "get": {
-        "operationId": "listShops",
-        "responses": {
-          "200": {
-            "description": "Shop list"
-          }
-        }
-      }
-    },
-    "/llms.txt": {
-      "get": {
-        "operationId": "getPlatformLlms",
-        "responses": {
-          "200": {
-            "description": "Platform index"
-          }
-        }
-      }
-    }
+   }
   },
-  "version": "2.0.0"
+  "/llms.txt": {
+   "get": {
+    "operationId": "getPlatformLlms",
+    "responses": {
+     "200": {
+      "description": "Platform index"
+     }
+    }
+   }
+  }
+ }
 }

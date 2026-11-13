@@ -4,9 +4,9 @@ Consumer-voice prompts for the order lifecycle. Each prompt is
 self-contained: paste it to a fresh agent with only the shop URL.
 "Expected" lines are grading notes for Hall, not part of the prompt.
 
-**关闭路径缺口：** 本文件现仅有 **19–27**。重构计划曾要求盲测至少覆盖
-8 / 15 / 18 / 25 / 26 / 27，但 1–18 未收录进仓库（git 历史亦无完整正文）。
-发版盲测以 **25、26、27** 为准；1–18 待 Hall 补回。
+**关闭路径缺口（定稿）：** 本文件仅有 **19–27**。1–18 从未完整进仓（git 无正文），
+**不补造、不可恢复**。发版盲测以 **25、26、27** 为准；其余关闭路径若需补测由 Hall
+另开新编号，不回溯虚构 1–18。
 
 Shop URLs (canonical host):
 - terra-pots: https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/

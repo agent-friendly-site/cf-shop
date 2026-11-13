@@ -3,11 +3,10 @@
 // GitHub Pages shop files, host rewritten to this Worker).
 
 import index_html from "../data/index.html?raw";
-import llms_full_txt from "../data/llms-full.txt?raw";
 import llms_txt from "../data/llms.txt?raw";
+import llms_full_txt from "../data/llms-full.txt?raw";
 import openapi_json from "../data/openapi.json";
 import robots_txt from "../data/robots.txt?raw";
-import shops_json from "../data/shops.json";
 import shops_bean_bloom_agent_json from "../data/shops/bean-bloom/agent.json";
 import shops_bean_bloom_api_catalog_json from "../data/shops/bean-bloom/api/catalog.json";
 import shops_bean_bloom_api_payment_json from "../data/shops/bean-bloom/api/payment.json";
@@ -16,8 +15,8 @@ import shops_bean_bloom_api_products_json from "../data/shops/bean-bloom/api/pro
 import shops_bean_bloom_api_recommendations_json from "../data/shops/bean-bloom/api/recommendations.json";
 import shops_bean_bloom_guide_md from "../data/shops/bean-bloom/guide.md?raw";
 import shops_bean_bloom_index_html from "../data/shops/bean-bloom/index.html?raw";
-import shops_bean_bloom_llms_full_txt from "../data/shops/bean-bloom/llms-full.txt?raw";
 import shops_bean_bloom_llms_txt from "../data/shops/bean-bloom/llms.txt?raw";
+import shops_bean_bloom_llms_full_txt from "../data/shops/bean-bloom/llms-full.txt?raw";
 import shops_bean_bloom_mcp_json from "../data/shops/bean-bloom/mcp.json";
 import shops_bean_bloom_openapi_json from "../data/shops/bean-bloom/openapi.json";
 import shops_bean_bloom_policies_json from "../data/shops/bean-bloom/policies.json";
@@ -31,8 +30,8 @@ import shops_paper_lantern_api_products_json from "../data/shops/paper-lantern/a
 import shops_paper_lantern_api_recommendations_json from "../data/shops/paper-lantern/api/recommendations.json";
 import shops_paper_lantern_guide_md from "../data/shops/paper-lantern/guide.md?raw";
 import shops_paper_lantern_index_html from "../data/shops/paper-lantern/index.html?raw";
-import shops_paper_lantern_llms_full_txt from "../data/shops/paper-lantern/llms-full.txt?raw";
 import shops_paper_lantern_llms_txt from "../data/shops/paper-lantern/llms.txt?raw";
+import shops_paper_lantern_llms_full_txt from "../data/shops/paper-lantern/llms-full.txt?raw";
 import shops_paper_lantern_mcp_json from "../data/shops/paper-lantern/mcp.json";
 import shops_paper_lantern_openapi_json from "../data/shops/paper-lantern/openapi.json";
 import shops_paper_lantern_policies_json from "../data/shops/paper-lantern/policies.json";
@@ -46,13 +45,14 @@ import shops_terra_pots_api_products_json from "../data/shops/terra-pots/api/pro
 import shops_terra_pots_api_recommendations_json from "../data/shops/terra-pots/api/recommendations.json";
 import shops_terra_pots_guide_md from "../data/shops/terra-pots/guide.md?raw";
 import shops_terra_pots_index_html from "../data/shops/terra-pots/index.html?raw";
-import shops_terra_pots_llms_full_txt from "../data/shops/terra-pots/llms-full.txt?raw";
 import shops_terra_pots_llms_txt from "../data/shops/terra-pots/llms.txt?raw";
+import shops_terra_pots_llms_full_txt from "../data/shops/terra-pots/llms-full.txt?raw";
 import shops_terra_pots_mcp_json from "../data/shops/terra-pots/mcp.json";
 import shops_terra_pots_openapi_json from "../data/shops/terra-pots/openapi.json";
 import shops_terra_pots_policies_json from "../data/shops/terra-pots/policies.json";
 import shops_terra_pots_starter_prompt_txt from "../data/shops/terra-pots/starter-prompt.txt?raw";
 import shops_terra_pots_well_known_agent_json from "../data/shops/terra-pots/well-known-agent.json";
+import shops_json from "../data/shops.json";
 import sitemap_xml from "../data/sitemap.xml?raw";
 import well_known_agent_json from "../data/well-known-agent.json";
 
@@ -118,4 +118,3 @@ type DataFileKey = keyof typeof DATA_FILES;
 export function dataFile(rel: string): DataFileValue | undefined {
   return DATA_FILES[rel as DataFileKey];
 }
-

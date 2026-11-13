@@ -1,13 +1,14 @@
 ---
 name: phase5-admin-upload
 description: >-
-  Phase 5 HonoX admin + proof-upload for cf-shop (cutover complete).
-  Use when working on app/ islands, admin shell, or upload page.
+  ARCHIVE — Phase 5 HonoX admin + proof-upload cutover (complete).
+  Historical checklist only; prefer parity-check / AGENTS for current rules.
 ---
 
-# Phase 5 — admin + upload UI（已切 HonoX）
+# ARCHIVE — Phase 5 admin + upload UI
 
-双轨已结束：仅 HonoX。见 `docs/phase5-ui-cutover.md` 与 `docs/refactor-plan.md` §5。不动 API/MCP/状态机。
+双轨已结束：仅 HonoX。切流记录见 `docs/archive/phase5-ui-cutover.md`；
+重构任务书见 `docs/archive/refactor-plan.md` §5。不动 API/MCP/状态机。
 
 ## Hard rules
 

@@ -377,7 +377,7 @@ scripts/
 
 ### 4.5 Phase 5 — 前端重写（HonoX，两个页面，见 §5）
 
-切流记录（双轨已结束）：见 `docs/phase5-ui-cutover.md`。
+切流记录（双轨已结束）：见 `docs/archive/phase5-ui-cutover.md`。
 Agent 执行清单：`.cursor/skills/phase5-admin-upload/SKILL.md`。
 **5.0–5.3 已完成**：仅 HonoX；`UI_MODE` 已删；Admin UX 精修见同文档结论。
 

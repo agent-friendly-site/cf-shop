@@ -1,203 +1,202 @@
 {
-  "openapi": "3.1.0",
-  "info": {
-    "title": "Terra Pots Ceramics — Agent API",
-    "version": "1.7.0",
-    "description": "Hand-thrown stoneware mugs and plates, made in Jingdezhen. Agent-first storefront at https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/ Paths in this document are absolute from the host root, e.g. /shops/terra-pots/llms.txt."
-  },
-  "servers": [
-    {
-      "url": "https://agent-friendly-platform.refined-x.workers.dev"
+ "openapi": "3.1.0",
+ "info": {
+  "title": "Terra Pots Ceramics — Agent API",
+  "version": "2.0.0",
+  "description": "Hand-thrown stoneware mugs and plates, made in Jingdezhen. Agent-first storefront at https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/ Paths in this document are absolute from the host root, e.g. /shops/terra-pots/llms.txt."
+ },
+ "servers": [
+  {
+   "url": "https://agent-friendly-platform.refined-x.workers.dev"
+  }
+ ],
+ "paths": {
+  "/shops/terra-pots/llms.txt": {
+   "get": {
+    "operationId": "getLlmsTxt",
+    "responses": {
+     "200": {
+      "description": "Shop entry point and index"
+     }
     }
-  ],
-  "paths": {
-    "/shops/terra-pots/llms.txt": {
-      "get": {
-        "operationId": "getLlmsTxt",
-        "responses": {
-          "200": {
-            "description": "Shop entry point and index"
-          }
-        }
-      }
-    },
-    "/shops/terra-pots/llms-full.txt": {
-      "get": {
-        "operationId": "getLlmsFull",
-        "responses": {
-          "200": {
-            "description": "Full shop corpus: products and policies"
-          }
-        }
-      }
-    },
-    "/shops/terra-pots/openapi.json": {
-      "get": {
-        "operationId": "getOpenApi",
-        "responses": {
-          "200": {
-            "description": "This document"
-          }
-        }
-      }
-    },
-    "/shops/terra-pots/agent.json": {
-      "get": {
-        "operationId": "getAgentCard",
-        "responses": {
-          "200": {
-            "description": "Agent card"
-          }
-        }
-      }
-    },
-    "/shops/terra-pots/api/catalog.json": {
-      "get": {
-        "operationId": "getCatalog",
-        "responses": {
-          "200": {
-            "description": "Product catalog"
-          }
-        }
-      }
-    },
-    "/shops/terra-pots/api/products.json": {
-      "get": {
-        "operationId": "getProducts",
-        "responses": {
-          "200": {
-            "description": "Product list with price and stock"
-          }
-        }
-      }
-    },
-    "/shops/terra-pots/policies.json": {
-      "get": {
-        "operationId": "getPolicies",
-        "responses": {
-          "200": {
-            "description": "Shipping, returns, privacy"
-          }
-        }
-      }
-    },
-    "/shops/terra-pots/mcp": {
-      "post": {
-        "operationId": "mcpStreamableHttp",
-        "summary": "MCP Streamable HTTP (live)",
-        "description": "Live endpoint: POST https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/mcp, Streamable HTTP, protocol 2025-06-18, tools: list_products, get_product, recommend_products, calculate_total, create_order, submit_payment_proof, confirm_payment, get_order, mark_shipped, confirm_receipt, cancel_order, update_buyer_info, get_payment_proof_upload_link. Catalog and orders are served from D1 on this Worker. See mcp.json."
-      }
-    },
-    "/shops/terra-pots/guide.md": {
-      "get": {
-        "operationId": "getShoppingGuide",
-        "responses": {
-          "200": {
-            "description": "Shopping-assistant guide: conversation flow, questions, recommendations"
-          }
-        }
-      }
-    },
-    "/shops/terra-pots/api/recommendations.json": {
-      "get": {
-        "operationId": "getRecommendations",
-        "responses": {
-          "200": {
-            "description": "Structured recommendations, bundles and free-shipping tips"
-          }
-        }
-      }
-    },
-    "/shops/terra-pots/api/presentation.json": {
-      "get": {
-        "operationId": "getPresentation",
-        "responses": {
-          "200": {
-            "description": "Canonical presentation IR: products, options, actions, totals, Markdown fallback, per-client adapters"
-          }
-        }
-      }
-    },
-    "/shops/terra-pots/api/payment.json": {
-      "get": {
-        "operationId": "getPayment",
-        "responses": {
-          "200": {
-            "description": "Offline payment methods, flow, and proof submission"
-          }
-        }
-      }
-    },
-    "/shops/terra-pots/api/orders/{order_id}/events": {
-      "get": {
-        "operationId": "getOrderEvents",
-        "description": "Order status timeline (order_events) for one order. Public read; the order id is the credential.",
-        "responses": {
-          "200": {
-            "description": "Order id, current status and the event timeline"
-          }
-        }
-      }
-    },
-    "/shops/terra-pots/admin/": {
-      "get": {
-        "operationId": "getAdminUi",
-        "description": "Seller admin web UI (human seller only, API-key login). Not for buyers' agents; not listed in llms.txt / agent.json.",
-        "responses": {
-          "200": {
-            "description": "Admin HTML page"
-          }
-        }
-      }
-    },
-    "/shops/terra-pots/admin/api/orders": {
-      "get": {
-        "operationId": "adminListOrders",
-        "description": "Seller admin: list orders (filter by status). Requires the shop admin key (Bearer) or session cookie.",
-        "responses": {
-          "200": {
-            "description": "Order counts by status + order list"
-          },
-          "401": {
-            "description": "Admin authentication required"
-          }
-        }
-      }
-    },
-    "/shops/terra-pots/admin/api/orders/{order_id}/confirm-payment": {
-      "post": {
-        "operationId": "adminConfirmPayment",
-        "description": "Seller admin: confirm receipt of an offline payment (same logic as the confirm_payment MCP tool). verified_amount_cny must equal the order total.",
-        "responses": {
-          "200": {
-            "description": "Order now paid"
-          },
-          "400": {
-            "description": "Precondition failed (wrong status or amount)"
-          },
-          "401": {
-            "description": "Admin authentication required"
-          }
-        }
-      }
-    },
-    "/shops/terra-pots/admin/api/orders/{order_id}/mark-shipped": {
-      "post": {
-        "operationId": "adminMarkShipped",
-        "description": "Seller admin: mark a paid order shipped (carrier + tracking_number optional).",
-        "responses": {
-          "200": {
-            "description": "Order now shipped"
-          },
-          "400": {
-            "description": "Precondition failed"
-          },
-          "401": {
-            "description": "Admin authentication required"
-          }
-        }
-      }
-    }
+   }
   },
-  "version": "2.0.0"
+  "/shops/terra-pots/llms-full.txt": {
+   "get": {
+    "operationId": "getLlmsFull",
+    "responses": {
+     "200": {
+      "description": "Full shop corpus: products and policies"
+     }
+    }
+   }
+  },
+  "/shops/terra-pots/openapi.json": {
+   "get": {
+    "operationId": "getOpenApi",
+    "responses": {
+     "200": {
+      "description": "This document"
+     }
+    }
+   }
+  },
+  "/shops/terra-pots/agent.json": {
+   "get": {
+    "operationId": "getAgentCard",
+    "responses": {
+     "200": {
+      "description": "Agent card"
+     }
+    }
+   }
+  },
+  "/shops/terra-pots/api/catalog.json": {
+   "get": {
+    "operationId": "getCatalog",
+    "responses": {
+     "200": {
+      "description": "Product catalog"
+     }
+    }
+   }
+  },
+  "/shops/terra-pots/api/products.json": {
+   "get": {
+    "operationId": "getProducts",
+    "responses": {
+     "200": {
+      "description": "Product list with price and stock"
+     }
+    }
+   }
+  },
+  "/shops/terra-pots/policies.json": {
+   "get": {
+    "operationId": "getPolicies",
+    "responses": {
+     "200": {
+      "description": "Shipping, returns, privacy"
+     }
+    }
+   }
+  },
+  "/shops/terra-pots/mcp": {
+   "post": {
+    "operationId": "mcpStreamableHttp",
+    "summary": "MCP Streamable HTTP (live)",
+    "description": "Live endpoint: POST https://agent-friendly-platform.refined-x.workers.dev/shops/terra-pots/mcp, Streamable HTTP, protocol 2025-06-18, tools: list_products, get_product, recommend_products, calculate_total, create_order, submit_payment_proof, confirm_payment, get_order, mark_shipped, confirm_receipt, cancel_order, update_buyer_info, get_payment_proof_upload_link. Catalog and orders are served from D1 on this Worker. See mcp.json."
+   }
+  },
+  "/shops/terra-pots/guide.md": {
+   "get": {
+    "operationId": "getShoppingGuide",
+    "responses": {
+     "200": {
+      "description": "Shopping-assistant guide: conversation flow, questions, recommendations"
+     }
+    }
+   }
+  },
+  "/shops/terra-pots/api/recommendations.json": {
+   "get": {
+    "operationId": "getRecommendations",
+    "responses": {
+     "200": {
+      "description": "Structured recommendations, bundles and free-shipping tips"
+     }
+    }
+   }
+  },
+  "/shops/terra-pots/api/presentation.json": {
+   "get": {
+    "operationId": "getPresentation",
+    "responses": {
+     "200": {
+      "description": "Canonical presentation IR: products, options, actions, totals, Markdown fallback, per-client adapters"
+     }
+    }
+   }
+  },
+  "/shops/terra-pots/api/payment.json": {
+   "get": {
+    "operationId": "getPayment",
+    "responses": {
+     "200": {
+      "description": "Offline payment methods, flow, and proof submission"
+     }
+    }
+   }
+  },
+  "/shops/terra-pots/api/orders/{order_id}/events": {
+   "get": {
+    "operationId": "getOrderEvents",
+    "description": "Order status timeline (order_events) for one order. Public read; the order id is the credential.",
+    "responses": {
+     "200": {
+      "description": "Order id, current status and the event timeline"
+     }
+    }
+   }
+  },
+  "/shops/terra-pots/admin/": {
+   "get": {
+    "operationId": "getAdminUi",
+    "description": "Seller admin web UI (human seller only, API-key login). Not for buyers' agents; not listed in llms.txt / agent.json.",
+    "responses": {
+     "200": {
+      "description": "Admin HTML page"
+     }
+    }
+   }
+  },
+  "/shops/terra-pots/admin/api/orders": {
+   "get": {
+    "operationId": "adminListOrders",
+    "description": "Seller admin: list orders (filter by status). Requires the shop admin key (Bearer) or session cookie.",
+    "responses": {
+     "200": {
+      "description": "Order counts by status + order list"
+     },
+     "401": {
+      "description": "Admin authentication required"
+     }
+    }
+   }
+  },
+  "/shops/terra-pots/admin/api/orders/{order_id}/confirm-payment": {
+   "post": {
+    "operationId": "adminConfirmPayment",
+    "description": "Seller admin: confirm receipt of an offline payment (same logic as the confirm_payment MCP tool). verified_amount_cny must equal the order total.",
+    "responses": {
+     "200": {
+      "description": "Order now paid"
+     },
+     "400": {
+      "description": "Precondition failed (wrong status or amount)"
+     },
+     "401": {
+      "description": "Admin authentication required"
+     }
+    }
+   }
+  },
+  "/shops/terra-pots/admin/api/orders/{order_id}/mark-shipped": {
+   "post": {
+    "operationId": "adminMarkShipped",
+    "description": "Seller admin: mark a paid order shipped (carrier + tracking_number optional).",
+    "responses": {
+     "200": {
+      "description": "Order now shipped"
+     },
+     "400": {
+      "description": "Precondition failed"
+     },
+     "401": {
+      "description": "Admin authentication required"
+     }
+    }
+   }
+  }
+ }
 }

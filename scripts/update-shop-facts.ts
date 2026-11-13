@@ -11,12 +11,12 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import {
-  ROOT,
   applyStatements,
-  parseLocalRemote,
   type D1Stmt,
+  parseLocalRemote,
+  ROOT,
+  runCliScript,
 } from "./lib/d1-wrangler.ts";
 
 const DATA = path.join(ROOT, "src", "data");
@@ -30,10 +30,9 @@ function buildStatements(): D1Stmt[] {
   const stmts: D1Stmt[] = [];
   for (const slug of SHOPS) {
     const pol = loadJson<{ order_statuses: unknown }>(`shops/${slug}/policies.json`);
-    const payFile = loadJson<{ payment: { summary: string; flow: unknown } }>(
+    const pay = loadJson<{ payment: { summary: string; flow: unknown } }>(
       `shops/${slug}/api/payment.json`,
-    );
-    const pay = payFile.payment;
+    ).payment;
     stmts.push({
       sql: "UPDATE shop_policies SET order_statuses = ? WHERE shop = ?",
       params: [JSON.stringify(pol.order_statuses), slug],
@@ -58,13 +57,4 @@ function main(): void {
   }
 }
 
-const isMain =
-  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (isMain) {
-  try {
-    main();
-  } catch (err) {
-    console.error(err instanceof Error ? err.message : err);
-    process.exit(1);
-  }
-}
+runCliScript(main, import.meta.url);

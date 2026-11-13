@@ -2,17 +2,17 @@
 
 给在这个仓库里干活的 coding agent 看的。先读这份文件，再动手。
 业务背景见 `README.md` 和 `docs/design-order-tracking-admin.md`。
-重构（Hono + TS + HonoX）**已完成**（v2.0.0）；历史任务书见 `docs/refactor-plan.md`。
+重构（Hono + TS + HonoX）**已完成**（v2.0.0+）；历史任务书见 `docs/archive/refactor-plan.md`。
 
 ## 这是什么
 
 单 Cloudflare Worker（Hono）+ D1 + R2 上的多商户 agent 专属商城。
 每个商户是一个 agent-only 店面：`/shops/:shop/`，发现靠 llms.txt，
 下单靠 MCP（`POST /shops/:shop/mcp`），付款线下，凭据靠一次性上传链接。
-当前版本 **2.0.0**，线上地址：https://agent-friendly-platform.refined-x.workers.dev
+当前版本 **2.0.1**，线上地址：https://agent-friendly-platform.refined-x.workers.dev
 
 三家演示店（数据全是测试数据）：bean-bloom（咖啡）、paper-lantern（文具）、
-terra-pots（陶土）。价格、政策、状态机见 `docs/refactor-plan.md` 附录 A，
+terra-pots（陶土）。价格、政策、状态机见 `docs/archive/refactor-plan.md` 附录 A，
 改代码前先读那张表。
 
 ## 常用命令
@@ -57,7 +57,7 @@ wrangler.toml
 | --- | --- |
 | `deploy-verify` | 构建部署、线上冒烟、回滚 |
 | `parity-check` | 店铺发现面 / MCP / 后台 API 契约 |
-| `phase5-admin-upload` | Phase 5 后台+上传页（历史清单；双轨已结束） |
+| `phase5-admin-upload` | **ARCHIVE** Phase 5 后台+上传切流清单（勿当现行 TODO） |
 
 ## 规矩
 
@@ -68,7 +68,8 @@ wrangler.toml
    - `routes` / `mcp` / `app` → 只调 `services/*`
    - `services/*` → 可调 `domain/*` + `db/repositories/*`
    - 接入层禁止 `import` repositories / `import * as db`
-   - 边界错误：服务抛 `DomainError`；HTTP `toHttpError`，MCP `toMcpError`
+   - 边界错误：服务抛 `DomainError`（常用便捷子类 `DomainRpcError`）；
+     HTTP `toHttpError`，MCP `toMcpError`
 4. **改店铺事实只改 `src/data/`**，再 `gen-data` / `seed` 或 `update-shop-facts`。
 5. **不要把密钥、token、后台 key 明文写进仓库**。丢了再 `gen-admin-keys`，
    不要为了测试去轮换 Hall 的 key。
@@ -97,7 +98,7 @@ wrangler.toml
 
 ## 当前状态
 
-- **v2.0.0**：重构收尾完成（Phase 0–6）。全仓无 `.py`；HonoX 后台/上传；
+- **v2.0.x**：重构收尾完成（Phase 0–6）。全仓无 `.py`；HonoX 后台/上传；
   运维脚本全 TS；线上冒烟 `tests/smoke.ts`。
-- 待 Hall：关 GitHub Pages；`TEST_PROMPTS` 关闭路径 1–18（现文件从 19 起，
-  盲测至少 25–27）。
+- `TEST_PROMPTS` 1–18 **不可恢复、不补造**；现行 19–27，盲测至少 25–27。
+- 待 Hall：关 GitHub Pages。

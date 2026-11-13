@@ -2,17 +2,10 @@
  * Order data access (Phase 3.x harden).
  * Reads + low-level writes only. Domain rules and orchestration live in services/orders.ts.
  */
+import { ORDER_STATUSES } from "../../domain/constants";
 import { paymentExpiresAt } from "../../domain/order";
-import {
-  ORDER_STATUSES,
-  type Order,
-  type OrderEvent,
-  type OrderRow,
-  type OrderStatus,
-  type PaymentProof,
-  rows,
-  writeEvent,
-} from "../shared";
+import { rows, writeEvent } from "../helpers";
+import type { Order, OrderEvent, OrderRow, OrderStatus, PaymentProof } from "../types";
 
 function orderShape(row: OrderRow, proofs: PaymentProof[], timeline: OrderEvent[]): Order {
   return {
@@ -184,7 +177,11 @@ export async function insertOrderRow(
   }).run();
 }
 
-/** Persist a status change + timeline event. Caller must validate the transition. */
+/**
+ * Persist a status change + timeline event.
+ * Caller must validate the transition. Optional `extraStmts` run in the same
+ * `db.batch` (e.g. payment_proofs INSERT) so proof + status stay atomic.
+ */
 export async function persistTransition(
   db: D1Database,
   order: Order,
@@ -193,6 +190,7 @@ export async function persistTransition(
   actor: string,
   note: string | null,
   extra: Record<string, unknown> = {},
+  extraStmts: D1PreparedStatement[] = [],
 ): Promise<Order | null> {
   const from = order.status;
   const now = new Date().toISOString();
@@ -213,7 +211,7 @@ export async function persistTransition(
     note,
     now,
   });
-  await db.batch([update, evt]);
+  await db.batch([...extraStmts, update, evt]);
   return getOrder(db, order.id);
 }
 

@@ -1,9 +1,9 @@
 /** @jsxImportSource react */
 import { createRoute } from "honox/factory";
-import ProofForm from "../../../../../islands/upload/proof-form";
 import type { AppEnv } from "../../../../../../src/routes/helpers";
 import * as catalog from "../../../../../../src/services/catalog";
 import * as orders from "../../../../../../src/services/orders";
+import ProofForm from "../../../../../islands/upload/proof-form";
 
 export default createRoute(async (c) => {
   const ctx = c as typeof c & { env: AppEnv["Bindings"] };

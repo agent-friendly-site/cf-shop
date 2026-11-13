@@ -27,7 +27,7 @@ pending_payment（已下单，待付款）
   ↘ cancelled（付款前买家/卖家可取消）
 ```
 
-- `completed` 两种入口：买家通过 agent 调 `confirm_receipt`；或发货满 7 天无人确认，由 Worker 的每日定时任务自动完成（写事件 `auto_completed`）。
+- `completed` 两种入口：买家通过 agent 调 `confirm_receipt`；或发货满 7 天无人确认，由 Worker cron（`* * * * *`）扫表自动完成（写事件 `auto_completed`）。
 - `cancelled` 只允许在 `paid` 之前；已付款的取消走退款流程（v1 不做）。
 - 每一次状态变化都写一条事件记录，订单详情里就是一条时间线。
 
@@ -102,7 +102,7 @@ GET/PUT /shops/:shop/admin/api/policies
 
 ## 七、实施步骤（审批通过后按此执行）
 
-1. migration 0004 + `db.js` 状态机与事件写入 + 每日定时自动完成（Worker scheduled handler）。
+1. migration 0004 + `db.js` 状态机与事件写入 + cron 自动完成（Worker `scheduled`；现为每分钟 `* * * * *`，与未付款扫表同触发器，见 §十三）。
 2. MCP 新工具：`confirm_receipt / cancel_order / mark_shipped`；`create_order` 加买家信息字段；更新 `guide.md`（凭据提交后 agent 才自动建跟踪任务）、`presentation.json`（订单时间线 + 跟踪消息模板）、`mcp.json` / `openapi.json`（版本 1.2.0，工具 11 个）。
 3. 管理 API + 后台网页 + 发 Key 的脚本；三家店各生成一把 Key（明文只给 Hall 一次）。
 4. 线上全流程实测：下单 → 交凭据 → 后台确认收款 → 后台标记发货 → 买家确认收货 → `completed`；另测金额不符拒绝、错误状态操作拒绝、未带 Key 调管理 API 被拒；老订单状态不变。
@@ -174,4 +174,4 @@ HTTP / MCP / HonoX 页面
 - **运维**：`scripts/*.ts`（seed / gen-data / update-shop-facts / gen-admin-keys），经 wrangler 写 D1；仓内无 Python。
 - **测试**：本地 Vitest + 线上 `npm run test:smoke`；盲测见 `TEST_PROMPTS.md`。
 
-重构任务书与阶段验收：`docs/refactor-plan.md`（Phase 0–6 完成）。
+重构任务书与阶段验收：`docs/archive/refactor-plan.md`（Phase 0–6 完成）。

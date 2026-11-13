@@ -1,14 +1,19 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { UNPAID_EXPIRY_MINUTES } from "../../domain/constants";
-import { toMcpError } from "../../domain/errors";
+import { DomainRpcError, toMcpError } from "../../domain/errors";
 import type { Env } from "../../env";
 import * as catalog from "../../services/catalog";
 import * as orders from "../../services/orders";
 import * as payments from "../../services/payments";
 import { ItemShape, mcpText } from "../shared";
 
-export function registerOrderTools(server: McpServer, env: Env, shop: string) {
+export function registerOrderTools(
+  server: McpServer,
+  env: Env,
+  shop: string,
+  publicOrigin: string,
+) {
   server.registerTool(
     "create_order",
     {
@@ -39,10 +44,11 @@ export function registerOrderTools(server: McpServer, env: Env, shop: string) {
           shippingAddress: shipping_address,
         });
         const payment = await catalog.getPayment(env.DB, shop);
-        if (!order) throw new Error("create_order failed: order is null");
+        if (!order) throw new DomainRpcError("create_order failed: order is null", -32000);
         const link = await payments.createProofUploadToken(env.DB, {
           shop,
           orderId: order.id,
+          baseUrl: publicOrigin,
         });
         return mcpText({
           order,
@@ -84,7 +90,7 @@ export function registerOrderTools(server: McpServer, env: Env, shop: string) {
     async ({ order_id }) => {
       try {
         const order = await orders.getOrder(env.DB, order_id);
-        if (!order) throw new Error(`unknown order_id: ${order_id}`);
+        if (!order) throw new DomainRpcError(`unknown order_id: ${order_id}`, -32602);
         return mcpText({ order });
       } catch (e) {
         return toMcpError(e);

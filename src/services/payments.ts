@@ -2,8 +2,10 @@
  * Payments service (Phase 3.x harden).
  * Proof submit / confirm / one-time upload tokens — domain rules live here.
  */
+import { sha256Hex } from "../db/helpers";
 import * as proofsRepo from "../db/repositories/proofs";
-import { DomainRpcError, PROOF_UPLOAD_TTL_DAYS, sha256Hex } from "../db/shared";
+import { PROOF_UPLOAD_TTL_DAYS } from "../domain/constants";
+import { DomainRpcError } from "../domain/errors";
 import {
   assertCanConfirmPayment,
   assertCanSubmitProof,
@@ -30,14 +32,26 @@ export async function addPaymentProof(
   // A proof on an already-paid (or later) order is rejected: the payment
   // is already verified and must not be re-opened by a new proof.
   assertCanSubmitProof(orderId, order.status);
-  const wasPending = order.status === "pending_payment";
-  await proofsRepo.insertTextPaymentProof(db, {
+  const note = `${paymentMethod} ${transactionId}`;
+  const insert = proofsRepo.prepareTextPaymentProofInsert(db, {
     orderId,
     paymentMethod,
     transactionId,
     amountCny,
-    wasPending,
   });
+  if (order.status === "pending_payment") {
+    return transitionOrder(
+      db,
+      order,
+      "payment_submitted",
+      "payment_proof_submitted",
+      "buyer",
+      note,
+      {},
+      [insert],
+    );
+  }
+  await insert.run();
   return getOrder(db, orderId);
 }
 
@@ -47,7 +61,8 @@ export async function createProofUploadToken(
     shop,
     orderId,
     ttlDays = PROOF_UPLOAD_TTL_DAYS,
-  }: { shop: string; orderId: string; ttlDays?: number },
+    baseUrl,
+  }: { shop: string; orderId: string; ttlDays?: number; baseUrl?: string },
 ) {
   const order = await getOrder(db, orderId);
   if (!order) {
@@ -79,7 +94,7 @@ export async function createProofUploadToken(
   });
   return {
     token,
-    url: proofsRepo.proofUploadUrl(shop, orderId, token),
+    url: proofsRepo.proofUploadUrl(shop, orderId, token, baseUrl),
     expires_at: expires,
   };
 }
@@ -122,8 +137,8 @@ export async function addImagePaymentProof(
   const order = await getOrder(db, orderId);
   if (!order) return null;
   assertCanSubmitProof(orderId, order.status);
-  const wasPending = order.status === "pending_payment";
-  await proofsRepo.insertImagePaymentProof(db, {
+  const note = `图片凭据 ${fileName}${transactionId ? ` · 单号 ${transactionId}` : ""}`;
+  const insert = proofsRepo.prepareImagePaymentProofInsert(db, {
     orderId,
     paymentMethod,
     fileName,
@@ -132,8 +147,20 @@ export async function addImagePaymentProof(
     r2Key,
     transactionId,
     amountCny,
-    wasPending,
   });
+  if (order.status === "pending_payment") {
+    return transitionOrder(
+      db,
+      order,
+      "payment_submitted",
+      "payment_proof_submitted",
+      "buyer",
+      note,
+      {},
+      [insert],
+    );
+  }
+  await insert.run();
   return getOrder(db, orderId);
 }
 

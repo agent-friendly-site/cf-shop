@@ -12,20 +12,27 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/app/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/app/components/ui/form";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/app/components/ui/form";
 import { Input } from "@/app/components/ui/input";
 import { Skeleton } from "@/app/components/ui/skeleton";
-import { orderIdFromSearch, setAdminSearch, useAdminSession } from "@/app/lib/admin-session";
 import { adminKeys, fetchOrder, postJson } from "@/app/lib/admin-queries";
+import { orderIdFromSearch, setAdminSearch, useAdminSession } from "@/app/lib/admin-session";
 import { formatDateTime, formatMoneyCny } from "@/app/lib/format";
 import { statusLabel, statusVariant } from "@/app/lib/order-status";
 import { getQueryClient } from "@/app/lib/query-client";
 import {
   type CancelValues,
   type ConfirmPaymentValues,
-  type ShipValues,
   cancelSchema,
   confirmPaymentSchema,
+  type ShipValues,
   shipSchema,
 } from "@/app/lib/schemas";
 import { toast } from "@/app/lib/toast";
@@ -169,7 +176,12 @@ function OrderDetailInner({ shop }: { shop: string }) {
       <div className="rounded-lg border border-border bg-card p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold">订单详情</h2>
-          <Button type="button" variant="ghost" size="sm" onClick={() => setAdminSearch({ order: null })}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setAdminSearch({ order: null })}
+          >
             关闭详情
           </Button>
         </div>
@@ -194,8 +206,8 @@ function OrderDetailInner({ shop }: { shop: string }) {
 
         <h3 className="mt-4 text-sm font-semibold">时间线</h3>
         <ul className="mt-1 space-y-1 text-sm text-muted-foreground">
-          {order.timeline?.map((e, i) => (
-            <li key={`${e.event}-${i}`}>
+          {order.timeline?.map((e) => (
+            <li key={`${e.created_at}-${e.event}-${e.note ?? ""}`}>
               {formatDateTime(e.created_at)} · {e.event}
               {e.note ? ` — ${e.note}` : ""}
             </li>
@@ -324,7 +336,10 @@ function OrderDetailInner({ shop }: { shop: string }) {
             <DialogDescription>取消后不可恢复为待付款。请填写原因（可选）。</DialogDescription>
           </DialogHeader>
           <Form {...cancelForm}>
-            <form className="space-y-3" onSubmit={cancelForm.handleSubmit((v) => cancelMut.mutate(v))}>
+            <form
+              className="space-y-3"
+              onSubmit={cancelForm.handleSubmit((v) => cancelMut.mutate(v))}
+            >
               <FormField
                 control={cancelForm.control}
                 name="reason"
@@ -356,7 +371,11 @@ function OrderDetailInner({ shop }: { shop: string }) {
             <DialogDescription>{lightbox?.alt}</DialogDescription>
           </DialogHeader>
           {lightbox && (
-            <img src={lightbox.src} alt={lightbox.alt} className="max-h-[70vh] w-full object-contain" />
+            <img
+              src={lightbox.src}
+              alt={lightbox.alt}
+              className="max-h-[70vh] w-full object-contain"
+            />
           )}
         </DialogContent>
       </Dialog>

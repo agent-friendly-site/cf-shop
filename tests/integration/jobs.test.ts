@@ -1,3 +1,8 @@
+/**
+ * Cron sweeps are exercised here via services/jobs.
+ * Production scheduled() lives on app/server.ts (Vite/HonoX entry);
+ * Vitest uses src/index.ts and does not bind scheduled.
+ */
 import { env } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
 import * as db from "../../src/db";

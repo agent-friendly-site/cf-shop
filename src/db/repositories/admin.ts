@@ -2,7 +2,7 @@
  * Admin data access (Phase 3.x harden).
  * Key/session SQL + product/policy/payment updates (validation in services/admin).
  */
-import { sha256Hex } from "../shared";
+import { sha256Hex } from "../helpers";
 import { getPayment, getPolicies, getProduct } from "./catalog";
 
 export async function setAdminKey(db: D1Database, shop: string, keyHash: string): Promise<void> {

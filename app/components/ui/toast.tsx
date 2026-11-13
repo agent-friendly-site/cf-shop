@@ -1,8 +1,8 @@
 /** @jsxImportSource react */
 import * as ToastPrimitive from "@radix-ui/react-toast";
 import { useEffect, useState } from "react";
-import { cn } from "@/app/lib/utils";
 import { dismissToast, subscribeToasts, type ToastItem } from "@/app/lib/toast";
+import { cn } from "@/app/lib/utils";
 
 export function Toaster() {
   const [items, setItems] = useState<ToastItem[]>([]);

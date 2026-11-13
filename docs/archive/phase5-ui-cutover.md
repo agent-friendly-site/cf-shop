@@ -24,6 +24,6 @@ POST /shops/:shop/orders/:id/upload-proof  ← API 不变
 
 ## 相关文档
 
-- 体验/实现要求：`docs/refactor-plan.md` §5
+- 体验/实现要求：`docs/archive/refactor-plan.md` §5
 - 部署冒烟：`.cursor/skills/deploy-verify/SKILL.md`
 - 契约比对：`.cursor/skills/parity-check/SKILL.md`

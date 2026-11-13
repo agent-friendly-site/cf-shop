@@ -4,11 +4,18 @@ import { QueryClientProvider, useMutation, useQuery, useQueryClient } from "@tan
 import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/app/components/ui/button";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/app/components/ui/form";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/app/components/ui/form";
 import { Input } from "@/app/components/ui/input";
 import { Skeleton } from "@/app/components/ui/skeleton";
-import { tabFromSearch, useAdminSession } from "@/app/lib/admin-session";
 import { type AdminProduct, adminKeys, fetchProducts, putJson } from "@/app/lib/admin-queries";
+import { tabFromSearch, useAdminSession } from "@/app/lib/admin-session";
 import { getQueryClient } from "@/app/lib/query-client";
 import { type ProductEditValues, productEditSchema } from "@/app/lib/schemas";
 import { toast } from "@/app/lib/toast";
@@ -140,9 +147,11 @@ function ProductsEditorInner({ shop }: { shop: string }) {
           {(productsQuery.error as Error).message || "加载商品失败"}
         </p>
       )}
-      {!productsQuery.isLoading && !productsQuery.isError && (productsQuery.data || []).length === 0 && (
-        <p className="mt-6 text-sm text-muted-foreground">暂无商品</p>
-      )}
+      {!productsQuery.isLoading &&
+        !productsQuery.isError &&
+        (productsQuery.data || []).length === 0 && (
+          <p className="mt-6 text-sm text-muted-foreground">暂无商品</p>
+        )}
 
       <ul className="mt-4 space-y-4">
         {(productsQuery.data || []).map((p) => (

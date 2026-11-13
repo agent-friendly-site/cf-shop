@@ -9,4 +9,4 @@ From Phase 2.3 onward:
 - Schema source of truth: `src/db/schema.ts`
 - New SQL: `drizzle/` via `npx drizzle-kit generate`
 - Apply: `npx wrangler d1 migrations apply agent-friendly-orders --local`
-  (see root README “D1 migrations” for the production baseline note)
+  (see root README **D1 migrations** section)

@@ -1,6 +1,7 @@
 /**
  * Unified domain errors (Phase 3.5).
- * Services throw DomainError; HTTP/MCP adapters translate via toHttpError / toMcpError.
+ * Services and domain helpers throw DomainError (usually via DomainRpcError).
+ * HTTP/MCP adapters translate via toHttpError / toMcpError.
  */
 
 export class DomainError extends Error {
@@ -21,8 +22,8 @@ export class DomainError extends Error {
 }
 
 /**
- * Legacy constructor used across repositories/domain helpers.
- * `code` argument is the JSON-RPC numeric code (-32602 / -32000).
+ * Convenience DomainError for JSON-RPC style call sites (domain + MCP + services).
+ * `rpcCode` is the JSON-RPC numeric code (-32602 / -32000).
  */
 export class DomainRpcError extends DomainError {
   constructor(message: string, rpcCode: number) {

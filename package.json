@@ -1,6 +1,6 @@
 {
   "name": "cf-shop",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "agent-friendly multi-merchant platform: one Hono Worker + D1 on Cloudflare. Agent-only storefronts at /shops/:shop/ with llms.txt discovery and a live MCP endpoint.",
   "directories": {
     "test": "tests"
@@ -11,7 +11,6 @@
     "update-shop-facts": "npx tsx scripts/update-shop-facts.ts",
     "gen-admin-keys": "npx tsx scripts/gen-admin-keys.ts",
     "build": "vite build --mode client && vite build && node -e \"const fs=require('fs');const p='dist/.assetsignore';const extra=['index.js','wrangler.json','wrangler.toml'];const cur=fs.existsSync(p)?fs.readFileSync(p,'utf8').split(/\\n/):[];fs.writeFileSync(p,[...new Set([...cur.filter(Boolean),...extra])].join('\\n')+'\\n')\"",
-    "build:legacy-esbuild": "node scripts/build.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply agent-friendly-orders --local",
     "typecheck": "tsc --noEmit",

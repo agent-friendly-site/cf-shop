@@ -1,12 +1,7 @@
 import { z } from "zod";
 
 const MAX_PROOF_BYTES = 5 * 1024 * 1024;
-const ALLOWED_PROOF_MIME = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-]);
+const ALLOWED_PROOF_MIME = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
 export const loginSchema = z.object({
   key: z.string().min(1, "请输入管理 Key"),
@@ -14,9 +9,7 @@ export const loginSchema = z.object({
 export type LoginValues = z.infer<typeof loginSchema>;
 
 export const confirmPaymentSchema = z.object({
-  verified_amount_cny: z
-    .number({ error: "请输入有效金额" })
-    .finite("请输入有效金额"),
+  verified_amount_cny: z.number({ error: "请输入有效金额" }).finite("请输入有效金额"),
 });
 export type ConfirmPaymentValues = z.infer<typeof confirmPaymentSchema>;
 
@@ -36,10 +29,7 @@ export const productEditSchema = z.object({
     .number({ error: "价格必须是数字" })
     .finite("价格必须是数字")
     .nonnegative("价格不能为负"),
-  stock: z
-    .number({ error: "库存必须是整数" })
-    .int("库存必须是整数")
-    .nonnegative("库存不能为负"),
+  stock: z.number({ error: "库存必须是整数" }).int("库存必须是整数").nonnegative("库存不能为负"),
 });
 export type ProductEditValues = z.infer<typeof productEditSchema>;
 
@@ -50,10 +40,7 @@ export const paymentMethodSchema = z.object({
 });
 
 export const policiesSchema = z.object({
-  shipping_flat_cny: z
-    .number({ error: "运费必须是数字" })
-    .finite("运费必须是数字")
-    .nonnegative(),
+  shipping_flat_cny: z.number({ error: "运费必须是数字" }).finite("运费必须是数字").nonnegative(),
   free_over_cny: z
     .number({ error: "满额包邮必须是数字" })
     .finite("满额包邮必须是数字")

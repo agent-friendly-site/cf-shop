@@ -3,7 +3,7 @@
  * Key/session + product/policy/payment edits with validation.
  */
 import * as adminRepo from "../db/repositories/admin";
-import { DomainRpcError } from "../db/shared";
+import { DomainRpcError } from "../domain/errors";
 
 export {
   createAdminSession,

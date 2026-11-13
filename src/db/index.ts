@@ -1,7 +1,17 @@
 // Compatibility facade for agent-friendly-platform.
 // Phase 4: access layer uses services/* directly. This facade remains for
-// tests/scripts that still `import * as db`. Public signatures unchanged.
+// tests/scripts that still `import * as db`. Prefer services/* for new code.
 
+export {
+  AUTO_COMPLETE_AFTER_DAYS,
+  FREE_SHIPPING_OVER,
+  ORDER_STATUSES,
+  type OrderStatus,
+  PROOF_UPLOAD_TTL_DAYS,
+  SHIPPING_FLAT,
+  UNPAID_EXPIRY_MINUTES,
+} from "../domain/constants";
+export { DomainError, DomainRpcError, toHttpError, toMcpError } from "../domain/errors";
 export {
   createAdminSession,
   deleteAdminSession,
@@ -12,7 +22,6 @@ export {
   updateProduct,
   verifyAdminKey,
 } from "../services/admin";
-
 export {
   getPayment,
   getPolicies,
@@ -22,7 +31,6 @@ export {
   listProducts,
   listShops,
 } from "../services/catalog";
-
 export {
   autoCompleteShipped,
   cancelOrder,
@@ -39,7 +47,6 @@ export {
   transitionOrder,
   updateBuyerInfo,
 } from "../services/orders";
-
 export {
   addImagePaymentProof,
   addPaymentProof,
@@ -50,25 +57,15 @@ export {
   verifyProofUploadToken,
 } from "../services/payments";
 
-export {
-  AUTO_COMPLETE_AFTER_DAYS,
-  DomainError,
-  DomainRpcError,
-  FREE_SHIPPING_OVER,
-  ORDER_STATUSES,
-  type Order,
-  type OrderEvent,
-  type OrderItemInput,
-  type OrderLineItem,
-  type OrderStatus,
-  type PaymentProof,
-  PROOF_UPLOAD_TTL_DAYS,
-  type Product,
-  SHIPPING_FLAT,
-  type Shop,
-  type ShopPolicies,
-  sha256Hex,
-  toHttpError,
-  toMcpError,
-  UNPAID_EXPIRY_MINUTES,
-} from "./shared";
+export { sha256Hex } from "./helpers";
+
+export type {
+  Order,
+  OrderEvent,
+  OrderItemInput,
+  OrderLineItem,
+  PaymentProof,
+  Product,
+  Shop,
+  ShopPolicies,
+} from "./types";

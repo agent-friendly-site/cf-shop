@@ -31,20 +31,26 @@ export function renderSql(stmt: D1Stmt): string {
 }
 
 export function applyStatements(stmts: D1Stmt[], remote: boolean, label: string): void {
-  const tmp = path.join(ROOT, ".wrangler", `${label}-${remote ? "remote" : "local"}.sql`);
+  const scope = remote ? "remote" : "local";
+  const tmp = path.join(ROOT, ".wrangler", `${label}-${scope}.sql`);
   fs.mkdirSync(path.dirname(tmp), { recursive: true });
   fs.writeFileSync(tmp, `${stmts.map(renderSql).join(";\n")};\n`, "utf8");
-  const args = [
-    "wrangler",
-    "d1",
-    "execute",
-    DB_NAME,
-    remote ? "--remote" : "--local",
-    "--file",
-    tmp,
-  ];
-  console.log(`applying ${stmts.length} statements via wrangler (${remote ? "remote" : "local"})…`);
-  execFileSync("npx", args, { cwd: ROOT, stdio: "inherit" });
+  console.log(`applying ${stmts.length} statements via wrangler (${scope})…`);
+  execFileSync("npx", ["wrangler", "d1", "execute", DB_NAME, `--${scope}`, "--file", tmp], {
+    cwd: ROOT,
+    stdio: "inherit",
+  });
+}
+
+export function runCliScript(main: () => void, moduleUrl: string): void {
+  const entry = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(moduleUrl);
+  if (!entry) return;
+  try {
+    main();
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : err);
+    process.exit(1);
+  }
 }
 
 export function parseLocalRemote(argv: string[], usage: string): { remote: boolean } {

@@ -1,4 +1,6 @@
-import { ORDER_STATUSES, type Product, rows, type Shop, type ShopPolicies } from "../shared";
+import { ORDER_STATUSES } from "../../domain/constants";
+import { rows } from "../helpers";
+import type { Product, Shop, ShopPolicies } from "../types";
 
 export async function listShops(db: D1Database): Promise<Shop[]> {
   return rows<Shop>(db, "SELECT * FROM shops ORDER BY slug");
